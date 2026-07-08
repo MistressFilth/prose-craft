@@ -1,0 +1,15 @@
+{
+    "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+    "name": "prose-voicecraft",
+    "version": "0.1.0",
+    "description": "A plugin for designing, using, and analyzing prose voice.",
+    "owner": {
+        "name": "QueerFilth"
+    },
+    "plugins": [
+        {
+            "name": "prose-voicecraft",
+            "source": "./"
+        }
+    ]
+}
