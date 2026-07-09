@@ -141,6 +141,19 @@ def test_compute_reference_averages_prior_records():
     assert reference["mean_agentless_passive_per_1k"] == pytest.approx(3.0)
 
 
+def test_compute_reference_skips_records_missing_a_key():
+    records = [
+        {"ppc_per_1k": 4.0, "agentless_passive_per_1k": 2.0},
+        {"ppc_per_1k": 8.0},  # missing agentless_passive_per_1k
+    ]
+    # A record missing either key is excluded entirely (not just from the
+    # mean it lacks), matching read_history's skip-malformed-line tolerance.
+    reference = CD.compute_reference(records)
+    assert reference["n"] == 1
+    assert reference["mean_ppc_per_1k"] == pytest.approx(4.0)
+    assert reference["mean_agentless_passive_per_1k"] == pytest.approx(2.0)
+
+
 def test_main_cli_no_surface_has_null_reference_and_writes_nothing(
     tmp_path, monkeypatch, capsys
 ):
