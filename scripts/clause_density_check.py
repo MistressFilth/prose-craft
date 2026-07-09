@@ -30,9 +30,8 @@ appends this draft's own record for future comparisons.
 from __future__ import annotations
 
 import argparse
-import itertools
+import datetime as dt
 import json
-import math
 import os
 import re
 import sys
@@ -334,6 +333,60 @@ def _ensure_nltk_ready() -> None:
         ) from exc
 
 
+def history_root() -> Path:
+    """Return `${CLAUDE_PLUGIN_DATA}/clause_density_history/`, mirroring
+    voice_io.py's voices_root() resolution pattern exactly."""
+    base = os.environ.get("CLAUDE_PLUGIN_DATA")
+    if base:
+        return Path(base) / "clause_density_history"
+    return Path.home() / ".claude" / "plugins" / "data" / "prose" / "clause_density_history"
+
+
+def _history_path(voice: str, surface: str) -> Path:
+    return history_root() / voice / f"{surface}.jsonl"
+
+
+def read_history(voice: str, surface: str) -> list[dict[str, Any]]:
+    """Read prior records for this voice+surface. Missing file -> empty
+    list. A malformed line is skipped, not fatal -- an append-only log can
+    get a torn write on a crash mid-append."""
+    path = _history_path(voice, surface)
+    if not path.is_file():
+        return []
+    records: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return records
+
+
+def append_history(voice: str, surface: str, record: dict[str, Any]) -> None:
+    path = _history_path(voice, surface)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
+
+def compute_reference(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Compute the reference mean for each channel across prior records.
+    n=0 -> both means None (nothing to report a mean of)."""
+    n = len(records)
+    if n == 0:
+        return {"n": 0, "mean_ppc_per_1k": None, "mean_agentless_passive_per_1k": None}
+    mean_ppc = sum(r["ppc_per_1k"] for r in records) / n
+    mean_passive = sum(r["agentless_passive_per_1k"] for r in records) / n
+    return {
+        "n": n,
+        "mean_ppc_per_1k": mean_ppc,
+        "mean_agentless_passive_per_1k": mean_passive,
+    }
+
+
 def measure_clause_density(body: str) -> dict[str, Any]:
     """Measure ppc/agentless_passive rates for one draft body (already
     front-matter-stripped). Combines regex + tag matches per feature,
@@ -386,13 +439,27 @@ def main(argv: list[str]) -> int:
 
     result: dict[str, Any] = {"draft": draft_stats, "reference": None}
 
+    if args.surface:
+        prior = read_history(args.voice, args.surface)
+        result["reference"] = compute_reference(prior)
+        record = {
+            "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+            "voice": args.voice,
+            "surface": args.surface,
+            "file": str(path.resolve()),
+            **draft_stats,
+        }
+        append_history(args.voice, args.surface, record)
+
     if args.json:
         print(json.dumps(result, indent=2))
     else:
+        ref = result["reference"]
+        ref_str = f" (reference n={ref['n']})" if ref else " (no surface declared)"
         print(
             f"ppc={draft_stats['ppc_per_1k']:.1f}/1k "
             f"agentless_passive={draft_stats['agentless_passive_per_1k']:.1f}/1k "
-            f"(words={draft_stats['word_count']})"
+            f"(words={draft_stats['word_count']}){ref_str}"
         )
     return 0
 
