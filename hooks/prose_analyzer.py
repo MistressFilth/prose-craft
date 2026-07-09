@@ -803,6 +803,81 @@ def render_voice(report, file_path, voice_name, error):
     return "\n".join(lines)
 
 
+def run_clause_density_check(file_path: str, voice_name: str, surface: str | None):
+    """Invoke clause_density_check.py as a subprocess, mirroring
+    run_voice_check/run_dispersion_check's subprocess contract. Returns
+    (result_dict | None, error_str | None)."""
+    plugin_root = os.environ.get(
+        "CLAUDE_PLUGIN_ROOT", os.path.dirname(os.path.dirname(__file__))
+    )
+    script = Path(plugin_root) / "scripts" / "clause_density_check.py"
+    if not script.exists():
+        return None, f"clause_density_check.py not found at {script}"
+
+    cmd = [sys.executable, str(script), file_path, "--voice", voice_name, "--json"]
+    if surface:
+        cmd.extend(["--surface", surface])
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "clause_density_check.py timed out"
+    except Exception as exc:
+        return None, f"clause_density_check.py failed: {exc}"
+    if proc.returncode != 0:
+        return None, proc.stderr.strip() or f"clause_density_check exited {proc.returncode}"
+    try:
+        result = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        return None, f"clause_density_check produced invalid JSON: {exc}"
+    return result, None
+
+
+_CLAUSE_DENSITY_NON_TARGET_NOTE = (
+    "Not a target -- F10 found reducing this density made prose worse in "
+    "3/3 tested cases."
+)
+
+
+def render_clause_density(result, error):
+    """Render the Clause density section. Returns '' when there is
+    nothing to report (no error and no result). Every line repeats the
+    sample size and a fixed non-target sentence, every time -- see this
+    feature's non-negotiable presentation constraint."""
+    if error:
+        return f"# Clause density\n\n> {error}"
+    if not result:
+        return ""
+    draft = result["draft"]
+    reference = result.get("reference")
+
+    def _line(label: str, rate: float, mean_key: str) -> str:
+        if reference is None:
+            context = "no surface declared, no genre to compare against"
+        elif reference["n"] == 0:
+            context = "no comparison history yet for this voice+surface"
+        else:
+            mean = reference[mean_key]
+            context = f"history: {mean:.1f}/1k, n={reference['n']}"
+        return f"- {label}: {rate:.1f}/1k words ({context}). {_CLAUSE_DENSITY_NON_TARGET_NOTE}"
+
+    lines = [
+        "# Clause density",
+        "",
+        _line("ppc", draft["ppc_per_1k"], "mean_ppc_per_1k"),
+        _line(
+            "agentless_passive",
+            draft["agentless_passive_per_1k"],
+            "mean_agentless_passive_per_1k",
+        ),
+    ]
+    return "\n".join(lines)
+
+
 def main():
     try:
         input_data = json.load(sys.stdin)
@@ -855,7 +930,13 @@ def main():
             profile, disp_error = run_dispersion_check(file_path, sibling_paths)
             dispersion_section = render_dispersion(profile, disp_error)
 
-        sections = [s for s in (voice_section, dispersion_section) if s]
+        surface_name = front_matter.get("surface")
+        cd_result, cd_error = run_clause_density_check(file_path, voice_name, surface_name)
+        clause_density_section = render_clause_density(cd_result, cd_error)
+
+        sections = [
+            s for s in (voice_section, dispersion_section, clause_density_section) if s
+        ]
         if not sections:
             sys.exit(0)
 
