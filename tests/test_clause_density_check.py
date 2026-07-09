@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 import clause_density_check as CD
@@ -78,3 +80,113 @@ def test_ensure_nltk_ready_raises_clear_error_when_download_fails(monkeypatch):
     with pytest.raises(RuntimeError) as excinfo:
         CD._ensure_nltk_ready()
     assert "python -m nltk.downloader" in str(excinfo.value)
+
+
+def test_history_root_uses_claude_plugin_data_env_var(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+    assert CD.history_root() == tmp_path / "clause_density_history"
+
+
+def test_read_history_returns_empty_list_when_file_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+    assert CD.read_history("kuudere", "verification_log") == []
+
+
+def test_append_then_read_history_round_trips(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+    record = {
+        "voice": "kuudere",
+        "surface": "verification_log",
+        "word_count": 300,
+        "ppc_count": 3,
+        "ppc_per_1k": 10.0,
+        "agentless_passive_count": 1,
+        "agentless_passive_per_1k": 3.3,
+    }
+    CD.append_history("kuudere", "verification_log", record)
+    records = CD.read_history("kuudere", "verification_log")
+    assert records == [record]
+
+
+def test_read_history_skips_corrupt_lines(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+    path = CD.history_root() / "kuudere" / "verification_log.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        '{"ppc_per_1k": 5.0, "agentless_passive_per_1k": 1.0}\n'
+        "not valid json at all\n"
+        '{"ppc_per_1k": 7.0, "agentless_passive_per_1k": 2.0}\n'
+    )
+    records = CD.read_history("kuudere", "verification_log")
+    assert len(records) == 2
+
+
+def test_compute_reference_empty_history():
+    reference = CD.compute_reference([])
+    assert reference == {
+        "n": 0,
+        "mean_ppc_per_1k": None,
+        "mean_agentless_passive_per_1k": None,
+    }
+
+
+def test_compute_reference_averages_prior_records():
+    records = [
+        {"ppc_per_1k": 4.0, "agentless_passive_per_1k": 2.0},
+        {"ppc_per_1k": 6.0, "agentless_passive_per_1k": 4.0},
+    ]
+    reference = CD.compute_reference(records)
+    assert reference["n"] == 2
+    assert reference["mean_ppc_per_1k"] == pytest.approx(5.0)
+    assert reference["mean_agentless_passive_per_1k"] == pytest.approx(3.0)
+
+
+def test_main_cli_no_surface_has_null_reference_and_writes_nothing(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+    draft = tmp_path / "draft.md"
+    draft.write_text(PLAIN)
+    rc = CD.main([str(draft), "--voice", "kuudere", "--json"])
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["reference"] is None
+    assert not (tmp_path / "clause_density_history").exists()
+
+
+def test_main_cli_with_surface_first_draft_has_n_zero_reference(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+    draft = tmp_path / "draft1.md"
+    draft.write_text(PPC_DENSE)
+    rc = CD.main([str(draft), "--voice", "kuudere", "--surface", "verification_log", "--json"])
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["reference"]["n"] == 0
+    records = CD.read_history("kuudere", "verification_log")
+    assert len(records) == 1
+    assert records[0]["ppc_per_1k"] == pytest.approx(out["draft"]["ppc_per_1k"])
+
+
+def test_main_cli_second_draft_compares_against_first_not_itself(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+    draft1 = tmp_path / "draft1.md"
+    draft1.write_text(PPC_DENSE)
+    CD.main([str(draft1), "--voice", "kuudere", "--surface", "verification_log", "--json"])
+    capsys.readouterr()
+
+    draft2 = tmp_path / "draft2.md"
+    draft2.write_text(PLAIN)
+    rc = CD.main([str(draft2), "--voice", "kuudere", "--surface", "verification_log", "--json"])
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["reference"]["n"] == 1
+    first_measured = CD.measure_clause_density(PPC_DENSE)
+    assert out["reference"]["mean_ppc_per_1k"] == pytest.approx(
+        first_measured["ppc_per_1k"]
+    )
+    records = CD.read_history("kuudere", "verification_log")
+    assert len(records) == 2
