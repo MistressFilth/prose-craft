@@ -659,7 +659,7 @@ def find_dispersion_siblings(file_path: str, voice_name: str) -> list[str]:
         return []
 
     siblings: list[tuple[float, str]] = []
-    for ext in ("*.md", "*.txt"):
+    for ext in ("*.txt", "*.md", "*.mdx", "*.rst", "*.tex"):
         for candidate in directory.glob(ext):
             candidate = candidate.resolve()
             if candidate == target:
