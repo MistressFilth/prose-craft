@@ -99,9 +99,7 @@ def find_tag_passive_matches(tagged: Tagged) -> list[dict[str, Any]]:
         word_i, tag_i = tagged[i]
         if tag_i in PASSIVE_VERB_TAGS and word_i.lower() in PASSIVE_AUX_WORDS:
             j = i + 1
-            adv_idx = None
             if j < n and tagged[j][1] == "RB":
-                adv_idx = j
                 j += 1
             if j < n and tagged[j][1] == "VBN":
                 vbn_idx = j
@@ -375,11 +373,16 @@ def append_history(voice: str, surface: str, record: dict[str, Any]) -> None:
 def compute_reference(records: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute the reference mean for each channel across prior records.
     n=0 -> both means None (nothing to report a mean of)."""
-    n = len(records)
+    # Records missing either key are excluded entirely (not just from the
+    # mean they lack), matching read_history's tolerance for malformed data.
+    usable = [
+        r for r in records if r.get("ppc_per_1k") is not None and r.get("agentless_passive_per_1k") is not None
+    ]
+    n = len(usable)
     if n == 0:
         return {"n": 0, "mean_ppc_per_1k": None, "mean_agentless_passive_per_1k": None}
-    mean_ppc = sum(r["ppc_per_1k"] for r in records) / n
-    mean_passive = sum(r["agentless_passive_per_1k"] for r in records) / n
+    mean_ppc = sum(r["ppc_per_1k"] for r in usable) / n
+    mean_passive = sum(r["agentless_passive_per_1k"] for r in usable) / n
     return {
         "n": n,
         "mean_ppc_per_1k": mean_ppc,
