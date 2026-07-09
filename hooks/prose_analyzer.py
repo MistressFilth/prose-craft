@@ -641,6 +641,117 @@ def run_voice_check(file_path, voice_name):
     return report, None
 
 
+def find_dispersion_siblings(file_path: str, voice_name: str) -> list[str]:
+    """Find same-directory, same-voice drafts written earlier than
+    `file_path`, for the v1 cross-draft dispersion checker (session-only,
+    same-directory-same-voice grouping -- see
+    docs/superpowers/specs/2026-07-09-dispersion-checker-design.md).
+
+    Returns absolute paths as strings, sorted oldest-to-newest, excluding
+    `file_path` itself. Siblings that fail to read or parse are skipped
+    silently, matching the tolerance this hook already applies elsewhere.
+    """
+    target = Path(file_path).resolve()
+    directory = target.parent
+    try:
+        target_mtime = target.stat().st_mtime
+    except OSError:
+        return []
+
+    siblings: list[tuple[float, str]] = []
+    for ext in ("*.md", "*.txt"):
+        for candidate in directory.glob(ext):
+            candidate = candidate.resolve()
+            if candidate == target:
+                continue
+            try:
+                mtime = candidate.stat().st_mtime
+            except OSError:
+                continue
+            if mtime >= target_mtime:
+                continue
+            try:
+                content = candidate.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            fm, _ = parse_front_matter(content)
+            if fm.get("voice") != voice_name:
+                continue
+            siblings.append((mtime, str(candidate)))
+
+    siblings.sort(key=lambda pair: pair[0])
+    return [path for _, path in siblings]
+
+
+def run_dispersion_check(new_draft_path: str, sibling_paths: list[str]):
+    """Invoke dispersion_check.py as a subprocess, mirroring
+    run_voice_check's subprocess contract. Returns (profile_dict | None,
+    error_str | None)."""
+    plugin_root = os.environ.get(
+        "CLAUDE_PLUGIN_ROOT", os.path.dirname(os.path.dirname(__file__))
+    )
+    script = Path(plugin_root) / "scripts" / "dispersion_check.py"
+    if not script.exists():
+        return None, f"dispersion_check.py not found at {script}"
+
+    cmd = [sys.executable, str(script), new_draft_path, *sibling_paths, "--json"]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "dispersion_check.py timed out"
+    except Exception as exc:
+        return None, f"dispersion_check.py failed: {exc}"
+    if proc.returncode != 0:
+        return None, proc.stderr.strip() or f"dispersion_check exited {proc.returncode}"
+    try:
+        profile = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        return None, f"dispersion_check produced invalid JSON: {exc}"
+    return profile, None
+
+
+def render_dispersion(profile, error):
+    """Render the Dispersion section. Returns '' when there is nothing to
+    report (no error and no profile) -- silence matches render_voice's
+    convention for a clean draft with no siblings to compare against.
+
+    Reports every raw signal from measure_set()'s altitude_1/altitude_2
+    blocks. No threshold, no flag, no "collapsed"/"converged" verdict
+    language anywhere -- see this feature's non-negotiable constraint #3.
+    """
+    if error:
+        return f"# Dispersion\n\n> {error}"
+    if not profile:
+        return ""
+    a1 = profile["altitude_1"]
+    a2 = profile["altitude_2"]
+    lines = [
+        "# Dispersion",
+        "",
+        f"Compared against {profile['n'] - 1} prior same-brief draft(s) "
+        f"(n={profile['n']} total).",
+        "",
+        "## Altitude 1 -- lexical",
+        f"- content_jaccard: {a1['content_jaccard']:.3f}",
+        f"- trigram_jaccard: {a1['trigram_jaccard']:.3f}",
+        f"- shared_mass: {a1['shared_mass']:.3f}",
+        f"- dispersion_index: {a1['dispersion_index']:.3f}",
+        "",
+        "## Altitude 2 -- frame/structure",
+        f"- distinct_opener_frames_fraction: {a2['distinct_opener_frames_fraction']:.3f}",
+        f"- mean_opener_similarity: {a2['mean_opener_similarity']:.3f}",
+        f"- distinct_structure_sigs_fraction: {a2['distinct_structure_sigs_fraction']:.3f}",
+        f"- mean_structural_similarity: {a2['mean_structural_similarity']:.3f}",
+        f"- dispersion_index: {a2['dispersion_index']:.3f}",
+    ]
+    return "\n".join(lines)
+
+
 def render_voice(report, file_path, voice_name, error):
     """Render the voice section. Returns '' when the voice check found
     nothing (silence is the strongest possible "this draft is fine").
@@ -737,11 +848,19 @@ def main():
 
         report, error = run_voice_check(file_path, voice_name)
         voice_section = render_voice(report, file_path, voice_name, error)
-        if not voice_section:
+
+        dispersion_section = ""
+        sibling_paths = find_dispersion_siblings(file_path, voice_name)
+        if sibling_paths:
+            profile, disp_error = run_dispersion_check(file_path, sibling_paths)
+            dispersion_section = render_dispersion(profile, disp_error)
+
+        sections = [s for s in (voice_section, dispersion_section) if s]
+        if not sections:
             sys.exit(0)
 
         header = f"**prose — {os.path.basename(file_path)}**"
-        message = header + "\n\n" + voice_section
+        message = header + "\n\n" + "\n\n".join(sections)
         print(json.dumps({"systemMessage": message}))
 
     except Exception:
