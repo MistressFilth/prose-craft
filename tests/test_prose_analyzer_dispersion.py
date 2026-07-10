@@ -156,12 +156,23 @@ def test_main_emits_message_when_voice_clean_but_dispersion_nonempty(
 def test_main_exits_silently_when_both_sections_empty(tmp_path, monkeypatch, capsys):
     """Clean voice check and no siblings to compare against: both sections
     are empty, so the hook must still exit silently (pre-existing
-    behavior, guarded against regressing)."""
+    behavior, guarded against regressing).
+
+    Also stubs out run_clause_density_check -- added alongside the
+    clause-density diagnostic, whose section is otherwise never empty
+    (it always reports the draft's own raw rates), which would
+    otherwise break this test's silent-exit premise.
+    """
     draft = tmp_path / "draft.md"
     _write(draft, "kuudere", "Status: two items remain.")
 
     monkeypatch.setattr(PA, "run_voice_check", lambda file_path, voice_name: (None, None))
     monkeypatch.setattr(PA, "find_dispersion_siblings", lambda file_path, voice_name: [])
+    monkeypatch.setattr(
+        PA,
+        "run_clause_density_check",
+        lambda file_path, voice_name, surface: (None, None),
+    )
     _run_main_with_payload(monkeypatch, draft)
 
     with pytest.raises(SystemExit) as excinfo:

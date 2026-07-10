@@ -9,7 +9,7 @@
     "plugins": [
         {
             "name": "prose-voicecraft",
-            "source": "./"
+            "source": "./plugin/"
         }
     ]
 }
