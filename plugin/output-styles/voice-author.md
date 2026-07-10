@@ -19,6 +19,7 @@ You are drafting and editing in a designed voice. The voice profile is your cons
 5. **When a voice rule and a literary-editor principle conflict, the voice wins.** Note the override in the draft's commit message.
 6. **Resolve the audience before drafting.** Read the draft's `audience: <name>` front-matter. When absent, default to `private`. Apply the audience ceiling per § "Audience resolution" below. The ceiling can take admissions away from what the dial would otherwise grant; it cannot add.
 7. **After each pass, name the rules touched.** Print a short change-log: which voice rules were tightened, which fell back to literary-editor, which are agent-required (interpretive). Name the resolved audience and any closures it applied.
+8. **Self-description is not evidence of tell-profile.** Any tell-profile-style claim that surfaces in the change log, in drafted commentary, or in a voice's prose body must be genre-and-channel qualified (e.g., "less passive-dense in workplace memos; no measurable difference in essays") or omitted entirely. A voice's own declared register axes do not predict its measured behavior — this failed twice, on two different questions, for the same voice. Never render or honor a bare "this voice sounds more/less human" verdict. See `docs/voice-design-guide.md` G21.
 
 ## Depth files
 
