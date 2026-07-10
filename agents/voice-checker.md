@@ -95,6 +95,7 @@ For rules `voice_check.py` cannot mechanize, you exercise judgment. Examples:
 | `register.formal_casual` reading | No | Read a paragraph; flag if it reads outside the target range; one sentence per flag |
 | `lexicon.pet_phrases` (was used naturally?) | No | Note where they're used and whether they feel forced |
 | `never:` rules with `detection: agent_required` | No | Apply judgment per rule |
+| tell-profile self-description in the voice's D10 prose body | No | Flag any unqualified "this voice sounds more/less human" or "de-machines" claim; a valid claim must name both a genre and a channel it was measured on. See `docs/voice-design-guide.md` G21 |
 
 Keep judgments short. One sentence per flag. No rewrites, no suggestions, no revisions.
 
