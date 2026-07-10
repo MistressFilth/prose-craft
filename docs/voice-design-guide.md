@@ -280,6 +280,10 @@ Deredere was the test subject for all four rounds; the other fifteen voices rece
 
 Voice editing is iterative and rollback is cheap. Before each change, copy the voice directory to a timestamped sibling under `${CLAUDE_PLUGIN_DATA}/voices/.backups/<timestamp>-<change-name>/`. Recover with a reverse copy. The family's iteration accumulated a backup per state change, and every one of them earned its keep at least once.
 
+### G21 — Self-description is not evidence of tell-profile
+
+A voice's own declared register axes do not predict its measured machine-tell behavior — this has been shown twice, on two different questions, for the same voice (F4, F16). Direction can flip by genre for the same voice on the same channel (F5), and a voice's two density channels can be oppositely genre-sensitive within itself (F14). A design note or dialogue answer that says "this voice de-machines" or "this voice sounds more human" is not a well-formed claim unless it names both the genre and the channel it was measured on — and even qualified, self-report is not the measurement. See `workbench/reinhart/FINDINGS.md` F4/F5/F14/F16 for the evidence trail.
+
 ---
 
 ## Authoring checklist
