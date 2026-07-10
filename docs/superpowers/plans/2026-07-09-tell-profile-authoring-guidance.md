@@ -106,8 +106,10 @@ Read the file back around lines 279-295 and confirm, one item at a time:
 2. The paragraph text matches the Step 2 block verbatim — no paraphrasing.
 3. `### G20` immediately precedes `### G21`, and `### G21`'s paragraph is immediately followed
    by the `---` divider (i.e. nothing was accidentally duplicated or dropped).
-4. Run `grep -c "^### G" docs/voice-design-guide.md` — expect `21` (one heading per gotcha,
-   G1 through G21).
+4. Run `grep -c "^### G" docs/voice-design-guide.md` — expect `19`, not 21. One existing
+   heading, `### G3-G5 — The convergence ladder`, covers three gotcha numbers under a single
+   heading, so 21 gotcha numbers currently span 19 headings (G1 through G21, minus the two
+   numbers G3-G5 collapses).
 
 - [ ] **Step 4: Commit**
 
