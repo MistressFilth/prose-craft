@@ -96,9 +96,18 @@ file):
       `docs/voice-design-guide.md` G21.
    ```
 
-   Because `voice-stylist`, `voice-checker`, and the `voice-author` output style all load
-   `voice-contract` via their `skills:` frontmatter array, this rule binds all three without
-   touching their individual files.
+   **Correction, added after the final whole-branch review of the implementation:** this
+   paragraph originally claimed `voice-stylist`, `voice-checker`, and the `voice-author` output
+   style all load `voice-contract` via their `skills:` frontmatter array, and that rule 7 alone
+   would therefore bind all three. That claim was checked against the actual frontmatter of
+   each file and found false — only `voice-stylist` loads `voice-contract`. `voice-checker`'s
+   `skills:` field lists only `voice-craft-reference`, and `voice-author` (an output style, not
+   an agent) has no `skills:` field at all; it carries its own inline copy of the operating
+   rules. A fourth task (Task 4 in the implementation plan) closes this gap directly: it adds
+   an equivalent rule inline to `voice-author.md`'s own numbered rule list, and adds a new row
+   to `voice-checker.md`'s existing "Agent-required judgments" table (the established pattern
+   that file already uses for unmechanizable checks like the Orwell stale-metaphor rule),
+   rather than making either file load the whole `voice-contract` skill.
 
 ## Integration points
 
