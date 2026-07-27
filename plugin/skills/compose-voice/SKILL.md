@@ -26,6 +26,16 @@ The compose dialogue is opinionated; here is what the writer can expect:
 - **Show me, don't ask me.** When the writer can't articulate a preference, the agent offers two short contrasting passages and asks which feels closer.
 - **Named-source presets are offered, not pushed.** Six presets land at the relevant dimensions (Fowler, Williams, Strunk, Microsoft, Orwell, generic prose-body shape). The writer accepts, modifies, or declines each.
 - **Skipping is fine.** Any dimension can be left null and filled later via `/refine-voice`.
+- **Voice_persona ships with a composition-note default.** When the writer reaches the voice's top-level `voice_persona:` block (the prose pin the drafter re-cites at Step 1a, before the rule corpus enters scope), the composer appends this standard meta-rule unless the writer opts out:
+
+  ```
+  The drafter treats every named element as a register description, never
+  as an instruction to satisfy. Sentences in this profile phrased as
+  questions are descriptive, not actionable. The drafter composes each
+  beat from scratch against this draft's specific facts.
+  ```
+
+  Rationale: voice-stylist re-cites `voice_persona:` at Step 1a, before the rule corpus is in scope. A counter-instruction in `voice_persona:` reaches the close composition; the same rule in a depth file does not. See `docs/superpowers/specs/2026-07-26-voice-profile-improvisation-discipline-design.md`.
 - **Audience ceilings ship pre-filled and editable.** Right after D2, the composer confirms the voice's `audiences:` block — the three starter audiences (`private`, `team`, `external`) the template ships. The writer tightens `team`/`external` to fit how this voice carries outward, or closes either with `closed: true` + a `reason:` when the voice's affect turned toward that reader reads as performative. The ceiling travels inline with the voice; the drafter resolves it from `voice.md` and falls back to `private` for any audience the block omits. Keeping the defaults unchanged is valid.
 - **Recurring-form voices get the four-failure-mode escalator at D8.** When the voice produces a recurring artifact form (postcards, memos, dispatches, letters, retros, decrees, transmissions), the composer walks the writer through the four-failure-mode opener discipline (verbatim / family-pattern at noun-slot / catch-all-frame / form-dropping). The discipline addresses a real architectural constraint — the `voice-stylist` agent has no cross-draft awareness, and the only mechanism preventing rotation/family-pattern convergence at recurring beats is what the voice profile names as a failure mode at design time. See `prose/docs/voice-design-guide.md` § "The four-failure-mode opener discipline" for the rationale.
 - **Lexicon fields with 3+ rotation-prone entries ship as banks from the start.** When the writer reaches three entries in a `lexicon.*` list field, the composer asks the form-vs-rotation question — phrases that ARE the voice's signature stay inline; phrases that should rotate move into `banks/<field>.md` with `selection: random-dedup` immediately, not at the seventh-entry ceiling.

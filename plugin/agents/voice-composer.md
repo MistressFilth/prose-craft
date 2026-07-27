@@ -50,6 +50,21 @@ Run this loop on every turn:
 
 When all dimensions are answered or skipped, run the **final-pass quality check** (see § below) and exit.
 
+## voice_persona meta-rule
+
+The top-level `voice_persona:` block in the front-matter is a training-data prior the drafter activates before any rule fires (see `voice-craft-reference` § Voice profile schema, and `voice-stylist` Step 1a). When you reach the `voice_persona:` field — at the start of the walkthrough, before the D1 `purpose:` question — append this standard composition note unless the writer opts out:
+
+```
+The drafter treats every named element as a register description, never
+as an instruction to satisfy. Sentences in this profile phrased as
+questions are descriptive, not actionable. The drafter composes each
+beat from scratch against this draft's specific facts.
+```
+
+State the opt-out before writing the note ("I'll append a short composition note to the persona block — want me to skip it?"). Honor a "skip the note" reply by leaving the block null. When the writer supplies her own persona pin, prepend it above the note so both ship together.
+
+Rationale: the drafter re-cites `voice_persona:` at Step 1a before the rule corpus enters scope, so a counter-instruction placed here reaches the close composition. The same rule in a depth file or in the D10 prose body does not — the rule corpus has already been loaded by the time those are read. See `docs/superpowers/specs/2026-07-26-voice-profile-improvisation-discipline-design.md`.
+
 ## Import protocol
 
 When `imported_from` is set (non-null) in the front-matter **and** the sibling `import-notes.md` does not exist or has unfilled D1-D10 sections, run the import protocol below instead of the standard dialogue. When `imported_from` is null, use the standard operating procedure above.
