@@ -219,9 +219,17 @@ Closing the verbatim phrase produces a noun-slot frame (`Sweetest <noun>,`). Clo
 
 Remove the canonical greeting and the next batch opens with body narration — the greeting form vanishes entirely. State the requirement explicitly and in bold before you name what to avoid. When something is non-negotiable, say so; the model honors stated rules and reasonably fills silence.
 
-### G7 — The unicode em-dash glyph leaks through `sed` rewrites
+### G7 — Glyph-ban and true dash-prohibition are different rules; do not write one and mean the other
 
-A never-rule that *shows* the forbidden `—` glyph defeats itself the moment a global `sed 's/—/--/g'` rewrites the rule's own text. **Describe the glyph, do not show it:** "Use of the unicode em-dash glyph. Always render as two hyphens (`--`)." To audit, grep for the glyph excluding the rule line.
+A never-rule that *shows* the forbidden `—` glyph defeats itself the moment a global `sed 's/—/--/g'` rewrites the rule's own text. **Describe the glyph, do not show it.** But naming the glyph is only half the design decision, and the half that gets conflated is the more consequential one.
+
+"Use of the unicode em-dash glyph. Always render as two hyphens (`--`)" is a **glyph-ban**, not a dash-ban. It swaps the typographic character and keeps the punctuation device: the drafter still reaches for a dash-shaped interruptive aside (TEX-1) or reframe (TEX-4) exactly as often, just typeset in ASCII. A writer who asked to stop seeing dashes as punctuation and gets a voice full of `--` has not been honored; the rule was satisfied by relabeling the glyph while the underlying move fired unchanged.
+
+When the writer actually wants the punctuation device gone, author a **true prohibition** instead: "Dash-as-punctuation in any form: unicode em dash, en dash, or ASCII double-hyphen used to carry a parenthetical, interruptive, or reframing move. Use a comma, colon, semicolon, or parentheses instead." Pair it with a matching `syntax.em_dashes: forbidden as sentence punctuation` (not `encouraged; render as --`), and redirect every other syntax field that names em-dashes as the mechanism (`parentheticals`, `transitions`, `emphasis`) to the substitute punctuation. TEX-1 and TEX-4 do not require a dash to fire; both are defined as a rhetorical move (a fact, then a clause commenting on it) that a comma, colon, or parenthesis carries equally well, so banning the glyph family costs the voice no move, only one of several introducer options.
+
+State an exception for cases where a dash is the uniquely correct mark and no other punctuation performs the job (a numeric or date range, a citation locator). That exception is orthogonal to the punctuation rule; it never licenses a dash back in as a stand-in for the banned parenthetical or reframing use.
+
+To audit either rule, grep for the glyph and for spaced `--` (which flags the punctuation use without flagging unspaced compound-word or range hyphens), excluding the rule's own line.
 
 ### G8 — `grep -F` on a YAML block scalar fails across line breaks
 
@@ -283,6 +291,36 @@ Voice editing is iterative and rollback is cheap. Before each change, copy the v
 ### G21 — Self-description is not evidence of tell-profile
 
 A voice's own declared register axes do not predict its measured machine-tell behavior — this has been shown twice, on two different questions, for the same voice (F4, F16). Direction can flip by genre for the same voice on the same channel (F5), and a voice's two density channels can be oppositely genre-sensitive within itself (F14). A design note or dialogue answer that says "this voice de-machines" or "this voice sounds more human" is not a well-formed claim unless it names both the genre and the channel it was measured on — and even qualified, self-report is not the measurement. See `workbench/reinhart/FINDINGS.md` F4/F5/F14/F16 for the evidence trail.
+
+### G22 — Append the standard composition-note meta-rule to voice_persona
+
+The model reads a voice profile as a redundant-anchor pool for each signature. Each named element (depth-file sample, surface-map approval, lore_corpus named territory, structure.closing mention, voice_persona literal phrasing) contributes probabilistically to retrieval.
+
+**Mechanism #1** (imperative-question phrasing in depth files): sentences phrased as yes/no questions (e.g. *"Did the Goddess sign off with XOXO?"*) read as instructions to satisfy. The model retrieves the named form even without brief specificity.
+
+**Mechanism #2** (multi-anchor redundancy): signatures are named in 5+ places across a single profile. Removing one anchor does not kill retrieval at mid-specificity briefs.
+
+**Mechanism #3** (counter-instruction in voice_persona): a single descriptive meta-rule in the `voice_persona:` block — the block voice-stylist re-cites at Step 1a, before the rule corpus is in scope — overrides all anchors. The rule corpus applies mechanically in Step 4b and does not reach the close composition.
+
+**Convention.** Every voice that improvises (i.e. every voice that does not have a literal signature as its identity) gets this 4-line meta-rule appended to its `voice_persona:` block:
+
+```
+The drafter treats every named element as a register description, never
+as an instruction to satisfy. Sentences in this profile phrased as
+questions are descriptive, not actionable. The drafter composes each
+beat from scratch against this draft's specific facts.
+```
+
+**Do not:**
+- Use imperative-question phrasing in the meta-rule (would re-introduce mechanism #1).
+- Embed a literal close-form (would re-introduce a verbatim anchor).
+- Substitute voice-persona-level rules for depth-file rules — depth-file edits do not reach the generation phase.
+
+**Voices that legitimately want strict retrieval** (a literal signature IS the voice's identity, e.g. a Sonnet-14-line-style form-fixed voice) omit the meta-rule.
+
+**Known limitation (2026-07-26 verification).** The meta-rule was empirically confirmed to override the imperative-question mechanism (papal.md) at severities 1, 3, 5 against discordian-deredere. It does NOT override named-gloss territories (e.g. a territory that lists "Kallisti and golden-apple closing forms" as vocabulary) at sev-1 happy-occasion briefs against the same voice. For voices whose seal/closer is canonized in voice_persona itself (a literal proper noun like KALLISTI in the persona prose), the meta-rule cannot win at low-severity. Fix: refactor the territory's gloss or strip the literal phrase from voice_persona for those voices.
+
+Evidence: investigation plan `/home/divinefilth/.claude/plans/when-using-voicecraft-tools-wobbly-avalanche.md`, Rounds 1-5 (2026-07-26). Spec: `docs/superpowers/specs/2026-07-26-voice-profile-improvisation-discipline-design.md`.
 
 ---
 
