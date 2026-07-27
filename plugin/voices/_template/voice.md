@@ -19,6 +19,15 @@ created: <YYYY-MM-DD>      # written once at first compose
 updated: <YYYY-MM-DD>      # rewritten on each refine
 author: <AUTHOR>           # the writer of the voice (not the agent)
 imported_from: null        # set by /import-voice; freeform string describing the source
+
+# Optional — training-data prior the drafter activates before any rule
+# fires. One paragraph naming the author/voice whose comedic or
+# rhetorical engine this voice channels. Read by voice-stylist at
+# Step 1a (before the rule corpus enters scope) and re-cited at the
+# top of Step 4a (generation phase). Voices without an authorial
+# signature to channel may omit this key — the prose body below
+# substitutes. See voice-craft-reference § "Voice profile schema".
+voice_persona: null
 #
 #---------------------------
 # D1. Purpose — what this voice is for
@@ -243,6 +252,13 @@ reads as guidance for everything the YAML rules above do not specify.
 
 When the agent drafts the body, it marks the draft so you can review
 or replace it:
+
+  <!-- meta-rule -- recommended for improvisation discipline; -->
+  <!-- see docs/superpowers/specs/2026-07-26-voice-profile-improvisation-discipline-design.md -->
+  <!-- The drafter treats every named element as a register description, never -->
+  <!-- as an instruction to satisfy. Sentences in this profile phrased as -->
+  <!-- questions are descriptive, not actionable. The drafter composes each -->
+  <!-- beat from scratch against this draft's specific facts. -->
 
   <!-- draft — revise or replace -->
   [drafted prose paragraph]
