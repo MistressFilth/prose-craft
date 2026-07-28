@@ -1,6 +1,7 @@
+---
 name: cohesion-craft
+description: Use when analyzing or improving cohesion and coherence in prose.
 user-invocable: false
-
 ---
 
 # Cohesion Craft Skill
