@@ -125,6 +125,13 @@ Read the `tex_shape_detector` warning in the voice_check report's `warnings` arr
 
 **Cap: one regeneration cycle.** When the trigger condition still holds after the regeneration pass, present the draft as-is and surface the open warning to the writer in the change log. Further iteration is the writer's call. The cap matches the existing one-revision-pass policy in Step 7 and prevents runaway loops.
 
+**Anti-thrash discipline (why the caps above must actually hold).** The one-pass and one-regeneration caps only bound *cost* if you also resist the urge to self-verify outside them. Two failure patterns burn tool calls and tokens without improving the draft:
+
+- **Manual `voice_check.py` invocation mid-composition.** The PostToolUse hook already runs the checker once per `Write`/`Edit`. Calling the script yourself between sections to "check progress" turns a bounded two-pass protocol into an unbounded one — each manual check tempts another round of small edits, each of which re-triggers the urge to check again. Compose the full draft (or the full expansion), let the hook's single automatic run drive Step 7, and stop there.
+- **Chasing a line-count target by writing, measuring, and expanding in a loop.** Line count is a noisy proxy for length: it moves with paragraph-break density and sentence wrapping, not with content, so hitting an exact line-count band by repeated measure-and-patch is expensive and often thrashes without progress. When a brief states a target in lines, convert it to an approximate word budget once, up front (state the words-per-line assumption you're using for this voice's typical sentence length), and plan section-by-section word budgets before writing a long-form piece. Write to that budget in as few passes as the two-cap protocol allows, rather than free-writing short and then iteratively padding against a line count.
+
+When a length target and a statistical band (rhythm variance, density ceiling, a TEX-move floor) are in genuine tension — satisfying one pushes the other out of range, or a voice rule makes a floor structurally unreachable (e.g., a TEX-1 dash-count floor when the voice's own `em_dashes` policy is `forbidden`) — do not keep local-searching for a fix past the Step 7/Step 8 caps. Name the tension once in the change log's `agent_required` section, explain which side you chose and why, and stop. That tension is the writer's call, not a problem to iterate away.
+
 **Output to the writer** — at the end of either path:
 
 > "Drafted to `<path>`. [N] voice rules honored, [M] revisions in second pass: [list]. Strip-test pass-rate: [rate]. Brief-overlap annotative rate: [rate]. [R] paragraphs regenerated for generative-texture; [P] open violations remain (your call to accept or push back)."

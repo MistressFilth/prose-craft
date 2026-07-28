@@ -20,6 +20,8 @@ Dispatch the `voice-stylist` agent in draft mode.
 `<name>` is a voice directory under `${CLAUDE_PLUGIN_DATA}/voices/`.
 `<brief>` is a short prose description of what the writer wants drafted (subject, length, audience). The brief can be a path to a markdown file or an inline string.
 
+**State length as a word count, not a line count.** Lines are a formatting artifact (they move with paragraph-break density and sentence wrapping, not with content), so a line-count target invites the drafter into a measure-write-measure-again loop chasing a noisy number. A word count is stable and lets the drafter plan section budgets up front instead of iterating against the target after the fact. When the writer gives a line count anyway, convert it to an approximate word budget once before dispatching and pass the word figure in the brief.
+
 `audience:<audience>` is OPTIONAL. When present, it sets the audience ceiling per § "Audience" below. Names: `private` (default when omitted), `team`, `external`, or any other name the voice declares in its own `audiences:` block. The argument may also be passed inside the brief itself as `audience:<name>` in front-matter; explicit `audience:` flag wins when both are present.
 
 ## What happens
