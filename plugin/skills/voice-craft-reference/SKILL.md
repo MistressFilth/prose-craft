@@ -77,7 +77,13 @@ rhythm:                     # D5
   forbidden_patterns: [<prose>, ...]  # prefix 're:' for mechanical regex
 
 syntax:                     # D6 — free-form policy per sub-field
-  em_dashes:      <prose | null>
+  em_dashes:      <prose | null>  # two distinct modes, do not conflate them:
+                                   #  - glyph-ban only: "encouraged; render as
+                                   #    `--`, never the unicode glyph"; keeps
+                                   #    dash-as-punctuation, just re-typesets it
+                                   #  - true prohibition: "forbidden as sentence
+                                   #    punctuation"; removes the device, pair
+                                   #    with a matching never-list rule (G7)
   colons:         <prose | null>
   semicolons:     <prose | null>
   parentheticals: <prose | null>

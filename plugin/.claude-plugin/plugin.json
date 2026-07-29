@@ -1,9 +1,9 @@
 {
     "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-    "name": "prose-voicecraft",
+    "name": "prose-craft",
     "version": "0.1.0",
     "description": "A plugin for designing, using, and analyzing prose voice.",
     "author": {
-        "name": "QueerFilth"
+        "name": "MistressFilth"
     }
 }
