@@ -160,7 +160,13 @@ rhythm:
   # sentence as punctuation".
   paragraph_shape: null
 
-  # Policy on one-sentence paragraphs, e.g., "use sparingly, for landing".
+  # Policy on one-sentence paragraphs. High-impact, so default to sparing use
+  # tied to a specific beat (a turn, a reveal, an aphoristic close), not a
+  # blanket "encouraged" -- an unscoped policy here reads as license to make
+  # it the default unit, which flattens the voice's own paragraph_shape above.
+  # Exception: dialogue and direct back-and-forth address use single-line
+  # beats as needed, since that's the natural unit of exchange.
+  # e.g., "sparingly, for landing; dialogue may use freely".
   one_sentence_paragraphs: null
 
   # Patterns the voice never produces; voice-checker flags violations.
@@ -173,7 +179,23 @@ rhythm:
 #---------------------------
 # Each value is free-form, e.g., "encouraged for parenthetical reframing"
 # or "rare; prefer two sentences".
-syntax:
+#
+# em_dashes has two distinct modes writers conflate at their peril:
+#   - glyph-ban only: "encouraged; render as `--`, never the unicode glyph."
+#     Keeps the dash-as-punctuation device (TEX-1/TEX-4 reframing); just
+#     bans the specific unicode character. The ASCII `--` still IS a dash
+#     used as punctuation: this mode does not remove dash punctuation,
+#     it re-typesets it.
+#   - true prohibition: "forbidden as sentence punctuation: no unicode —,
+#     no en dash, no ASCII `--`." Removes the device entirely; the voice's
+#     never-list must carry the matching rule (see voice-design-guide.md
+#     G7). Reframing moves route through commas, colons, semicolons, or
+#     parentheses instead. State an exception only for cases where a dash
+#     is the uniquely correct mark and no other punctuation can do the
+#     job (a numeric/date range, a citation locator), never as a
+#     stand-in for the banned constructions.
+# Pick one mode deliberately; do not describe the glyph-ban mode as if it
+# were the true prohibition (or vice versa).
   em_dashes: null
   colons: null
   semicolons: null
@@ -274,4 +296,25 @@ one sentence of elaboration. For example:
 
 Replace this comment block with your prose paragraph (or leave the
 file as-is to keep the body empty).
+-->
+
+<!--
+Optional: voice_persona — the drafter's training-data prior
+
+Place a top-level `voice_persona:` block above `purpose:` when the
+voice channels a named register or author. The persona is the prior
+the drafter activates before any rule fires — the engine the voice
+channels. When populating it, consider appending this meta-rule so
+the named elements across the profile (territories, samples, check
+criteria, signature forms) point the drafter at activations, not
+retrievals:
+
+  Composition note for the drafter: the named elements across this
+  profile (territories, samples, check criteria, signature forms)
+  point at activations, not at phrases to retrieve. The drafter
+  composes each beat fresh for this draft's occasion.
+
+The meta-rule binds authored named anchors into registers to improvise
+from, not phrases to retrieve. Skip it when the voice has no
+authorial signature to channel; the prose body above substitutes.
 -->
