@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.release import classify_bump, next_version
+from scripts import release
+from scripts.release import _apply_transaction, classify_bump, next_version
 
 
 @pytest.mark.parametrize(
@@ -30,3 +31,77 @@ def test_breaking_footer_is_major() -> None:
 )
 def test_next_version(current: str, bump: str, expected: str) -> None:
     assert next_version(current, bump) == expected
+
+
+@pytest.mark.parametrize(
+    "bad_version",
+    [
+        "01.2.3",
+        "1.02.3",
+        "1.2.03",
+        "1.2",
+        "1.2.3.4",
+        "v1.2.3",
+        "1.2.3-beta",
+        "a.b.c",
+        "1.2.-3",
+        "",
+    ],
+)
+def test_next_version_rejects_noncanonical(bad_version: str) -> None:
+    with pytest.raises(ValueError):
+        next_version(bad_version, "patch")
+
+
+@pytest.mark.parametrize("bad_bump", ["", "MAJOR", "build", "feature", "release"])
+def test_next_version_rejects_unknown_bump(bad_bump: str) -> None:
+    with pytest.raises(ValueError):
+        next_version("1.2.3", bad_bump)
+
+
+def test_apply_transaction_rolls_back_on_failure(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If any surface write fails, every previously touched file is restored."""
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("original-a", encoding="utf-8")
+    b.write_text("original-b", encoding="utf-8")
+
+    real_atomic = release._atomic_write
+    calls = {"count": 0}
+
+    def maybe_fail(path, content):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise OSError("simulated write failure")
+        return real_atomic(path, content)
+
+    monkeypatch.setattr(release, "_atomic_write", maybe_fail)
+
+    surfaces = [
+        ("a", a, lambda text: "new-a"),
+        ("b", b, lambda text: "new-b"),
+        ("a-again", a, lambda text: "new-a-again"),
+    ]
+
+    with pytest.raises(OSError, match="simulated"):
+        _apply_transaction(surfaces)
+
+    assert a.read_text(encoding="utf-8") == "original-a"
+    assert b.read_text(encoding="utf-8") == "original-b"
+
+
+def test_apply_transaction_succeeds_when_all_writes_pass(
+    tmp_path,
+) -> None:
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("original-a", encoding="utf-8")
+    b.write_text("original-b", encoding="utf-8")
+    surfaces = [
+        ("a", a, lambda text: "new-a"),
+        ("b", b, lambda text: "new-b"),
+    ]
+    snapshots = _apply_transaction(surfaces)
+    assert snapshots == {a: "original-a", b: "original-b"}
+    assert a.read_text(encoding="utf-8") == "new-a"
+    assert b.read_text(encoding="utf-8") == "new-b"
