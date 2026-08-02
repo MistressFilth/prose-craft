@@ -14,3 +14,7 @@ build/
 docs/superpowers/drafts/
 docs/superpowers/plans/2026-07-26-*
 docs/superpowers/specs/2026-07-26-*
+
+# Harness artifacts
+AGENTS.local.md
+.claude/settings.local.json
