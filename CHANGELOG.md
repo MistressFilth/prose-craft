@@ -37,6 +37,14 @@
   `voice edit <file> --voice <name> [--in-place]` dispatches the
   voice-stylist agent in `edit` mode and optionally writes the
   revised text back to the source file. All four honor `--voices-root`.
+- CLI subcommand: `mcp` launches the FastMCP server over stdio for
+  MCP hosts (Claude Code, Cursor, etc.).
+- FastMCP server (`prose_craft.mcp`): exposes the engine as 8 tools
+  (`analyze_prose`, `voice_check`, `dispersion_check`,
+  `clause_density_check`, `edit_prose`, `architect_prose`,
+  `tune_diction`, `voice_compose_step`) and 2 resources
+  (`prose://voices` markdown list, `prose://voices/{name}` raw
+  voice.md body) callable from any MCP host.
 
 ### Changed
 - Rewrite as pydantic-ai CLI + FastMCP server. Plugin reduced to thin adapter.

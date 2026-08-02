@@ -8,8 +8,10 @@ from prose_craft.voices.io import (
     VoiceProfileNotFound,
     list_voices,
     read_voice,
+    read_voice_file,
     write_voice,
 )
+from prose_craft.voices.location import VoiceNameError
 from prose_craft.voices.model import (
     DictionConfig,
     LexiconConfig,
@@ -35,6 +37,25 @@ def test_read_voice_from_fixture(tmp_path):
 def test_read_voice_missing(tmp_voices_root):
     with pytest.raises(VoiceProfileNotFound):
         read_voice("absent", root=tmp_voices_root)
+
+
+def test_read_voice_file_returns_full_text(tmp_voices_root):
+    body = "---\nvoice: raw\nversion: 1\n---\n\n# Body\n"
+    path = tmp_voices_root / "raw" / "voice.md"
+    path.parent.mkdir()
+    path.write_text(body, encoding="utf-8")
+
+    assert read_voice_file("raw", root=tmp_voices_root) == body
+
+
+def test_read_voice_file_missing(tmp_voices_root):
+    with pytest.raises(VoiceProfileNotFound):
+        read_voice_file("absent", root=tmp_voices_root)
+
+
+def test_read_voice_file_rejects_invalid_name(tmp_voices_root):
+    with pytest.raises(VoiceNameError):
+        read_voice_file("../escape", root=tmp_voices_root)
 
 
 def test_write_voice_round_trip(tmp_voices_root):

@@ -19,6 +19,7 @@ Subcommands:
   per-dimension refinement and is ignored today.
 * ``voice draft`` — run the voice-stylist agent in draft mode.
 * ``voice edit`` — run the voice-stylist agent in edit mode against a file.
+* ``mcp`` — launch the FastMCP server over stdio for MCP hosts.
 * ``migrate voices`` — copy voice profiles from a legacy location to the
   XDG root.
 """
@@ -520,6 +521,14 @@ def voice_edit(
 
 migrate_app = typer.Typer(help="Migration helpers.")
 app.add_typer(migrate_app, name="migrate")
+
+
+@app.command()
+def mcp() -> None:
+    """Run the FastMCP server over stdio."""
+    from prose_craft.mcp import run_stdio
+
+    run_stdio()
 
 
 @migrate_app.command("voices")

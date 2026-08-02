@@ -48,6 +48,17 @@ def read_voice(name: str, *, root: Path | None = None) -> "VoiceProfile":
     return _parse_voice_file(path)
 
 
+def read_voice_file(name: str, *, root: Path | None = None) -> str:
+    """Return the raw voice.md contents (front-matter + prose body).
+
+    Raises VoiceProfileNotFound if the file does not exist.
+    """
+    path = voice_path(name, root=root)
+    if not path.exists():
+        raise VoiceProfileNotFound(f"voice profile {name!r} not found at {path}")
+    return path.read_text(encoding="utf-8")
+
+
 def read_voice_raw(name: str, *, root: Path | None = None) -> tuple["VoiceProfile", str]:
     """Parse voice.md and return (profile, prose_body).
 
