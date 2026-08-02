@@ -42,6 +42,13 @@ __all__ = ["ProseCraft"]
 # subtype of the bare `Agent` class. The cache assignment and the
 # per-accessor return types are what keep callers honest; the type
 # ignores on the cache boundary document the upcast from `T` to `Agent`.
+# TODO(whole-branch-review): Each agent should expose the deterministic
+# primitives as tools per the spec's Agent Contracts table. The current
+# implementation gives every agent only `read_file`. Decide between:
+# (a) wrapping the analysis primitives as per-agent tools and rewriting
+# the per-agent tests, or (b) amending the spec to "model handles analysis
+# in-context." Defer the decision to the user; do not pick arbitrarily.
+
 T = TypeVar("T")
 
 # Per-line `# type: ignore[import-untyped]` comments on the seven

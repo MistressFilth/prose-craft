@@ -75,10 +75,8 @@ async def dispersion_check(
 @mcp.tool
 async def clause_density_check(
     file_path: str,
-    voice: str,
-    surface: str | None = None,
 ) -> dict[str, object]:
-    """Measure passive + participial clause density for the voice+surface pair."""
+    """Measure passive + participial clause density."""
     text = Path(file_path).read_text(encoding="utf-8")
     words = tokenize_words(text)
     cd = measure_clause_density(text, words)

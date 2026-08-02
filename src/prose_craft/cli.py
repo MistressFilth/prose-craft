@@ -26,10 +26,14 @@ Subcommands:
 
 from __future__ import annotations
 
+from functools import wraps
 from pathlib import Path
+import sys
+import traceback
 from typing import Any, Literal
 
 import typer
+from pydantic_ai import ModelRetry, UsageLimitExceeded
 from rich.console import Console
 from rich.markdown import Markdown
 
@@ -37,7 +41,14 @@ from prose_craft import __version__
 from prose_craft.agents.results import VoiceDelta
 from prose_craft.config import get_model, get_voices_root
 from prose_craft.orchestrator.root import ProseCraft
-from prose_craft.voices.io import list_voices, read_voice, read_voice_raw, write_voice
+from prose_craft.voices.io import (
+    VoiceProfileNotFound,
+    list_voices,
+    read_voice,
+    read_voice_raw,
+    write_voice,
+)
+from prose_craft.voices.location import voice_path
 from prose_craft.voices.model import (
     DictionConfig,
     LexiconConfig,
@@ -56,6 +67,28 @@ app = typer.Typer(
 )
 console = Console()
 
+
+def _handle_errors(func: Any) -> Any:
+    """Render the CLI's documented exception classes consistently."""
+
+    @wraps(func)
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return func(*args, **kwargs)
+        except (ModelRetry, UsageLimitExceeded) as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=1) from exc
+        except VoiceProfileNotFound as exc:
+            typer.echo(str(exc), err=True)
+            typer.echo("Run `prose voice list` to see available voices.", err=True)
+            raise typer.Exit(code=2) from exc
+        except Exception:
+            traceback.print_exc(file=sys.stderr)
+            raise typer.Exit(code=1)
+
+    return wrapped
+
+
 voice_app = typer.Typer(help="Voice profile operations.")
 app.add_typer(voice_app, name="voice")
 
@@ -68,12 +101,14 @@ def _voices_root_opt(root: Path | None) -> Path:
 
 
 @app.command()
+@_handle_errors
 def version() -> None:
     """Print the engine version and exit."""
     typer.echo(f"prose-craft {__version__}")
 
 
 @app.command()
+@_handle_errors
 def config(
     model: str | None = typer.Option(None, "--model", help="Override the model."),
     voices_root: Path | None = typer.Option(
@@ -92,6 +127,7 @@ def config(
 
 
 @voice_app.command("list")
+@_handle_errors
 def voice_list(
     voices_root: Path | None = typer.Option(None, "--voices-root"),
 ) -> None:
@@ -106,6 +142,7 @@ def voice_list(
 
 
 @voice_app.command("show")
+@_handle_errors
 def voice_show(
     name: str = typer.Argument(..., help="Voice name."),
     raw: bool = typer.Option(False, "--raw", help="Print raw file contents."),
@@ -114,7 +151,7 @@ def voice_show(
     """Print a voice profile as markdown or raw file."""
     root = _voices_root_opt(voices_root)
     if raw:
-        path = root / name / "voice.md"
+        path = voice_path(name, root=root)
         if not path.exists():
             raise typer.BadParameter(f"voice {name!r} not found at {path}")
         typer.echo(path.read_text(encoding="utf-8"))
@@ -174,6 +211,7 @@ def _render_prose_diagnostic(diag: Any) -> str:
 
 
 @app.command()
+@_handle_errors
 def analyze(
     file: Path = typer.Argument(..., exists=True),  # noqa: B008
     voice: str | None = typer.Option(None, "--voice"),
@@ -204,6 +242,7 @@ def analyze(
 
 
 @app.command()
+@_handle_errors
 def edit(
     file: Path = typer.Argument(..., exists=True),  # noqa: B008
     voice: str | None = typer.Option(None, "--voice"),
@@ -233,6 +272,7 @@ def edit(
 
 
 @app.command()
+@_handle_errors
 def architect(
     file: Path = typer.Argument(..., exists=True),  # noqa: B008
     voice: str | None = typer.Option(None, "--voice"),
@@ -251,6 +291,7 @@ def architect(
 
 
 @app.command("tune-diction")
+@_handle_errors
 def tune_dict(
     file: Path = typer.Argument(..., exists=True),  # noqa: B008
     voice: str | None = typer.Option(None, "--voice"),
@@ -268,11 +309,11 @@ def tune_dict(
 
 
 @voice_app.command("check")
+@_handle_errors
 def voice_check(
     file: Path = typer.Argument(..., exists=True),  # noqa: B008
     voice: str = typer.Option(..., "--voice"),  # noqa: B008
     tolerance: Literal["strict", "normal", "relaxed"] = typer.Option("normal", "--tolerance"),
-    brief: Path | None = typer.Option(None, "--brief"),  # noqa: B008
     as_json: bool = typer.Option(False, "--json"),
     voices_root: Path | None = typer.Option(None, "--voices-root"),
 ) -> None:
@@ -308,6 +349,7 @@ def voice_check(
 
 
 @voice_app.command("init")
+@_handle_errors
 def voice_init(
     name: str = typer.Argument(...),
     voices_root: Path | None = typer.Option(None, "--voices-root"),
@@ -438,6 +480,7 @@ def _voice_compose_repl(name: str, root: Path) -> None:
 
 
 @voice_app.command("compose")
+@_handle_errors
 def voice_compose(
     name: str = typer.Argument(...),
     voices_root: Path | None = typer.Option(None, "--voices-root"),
@@ -448,6 +491,7 @@ def voice_compose(
 
 
 @voice_app.command("refine")
+@_handle_errors
 def voice_refine(
     name: str = typer.Argument(...),
     dim: str | None = typer.Argument(
@@ -465,6 +509,7 @@ def voice_refine(
 
 
 @voice_app.command("draft")
+@_handle_errors
 def voice_draft(
     name: str = typer.Argument(...),
     brief: str = typer.Argument(..., help="The brief to write to."),
@@ -499,6 +544,7 @@ def voice_draft(
 
 
 @voice_app.command("edit")
+@_handle_errors
 def voice_edit(
     file: Path = typer.Argument(..., exists=True),  # noqa: B008
     voice: str = typer.Option(..., "--voice"),  # noqa: B008
@@ -524,6 +570,7 @@ app.add_typer(migrate_app, name="migrate")
 
 
 @app.command()
+@_handle_errors
 def mcp() -> None:
     """Run the FastMCP server over stdio."""
     from prose_craft.mcp import run_stdio
@@ -532,6 +579,7 @@ def mcp() -> None:
 
 
 @migrate_app.command("voices")
+@_handle_errors
 def migrate_voices_cmd(
     src: Path | None = typer.Option(None, "--src"),
     dst: Path | None = typer.Option(None, "--dst"),

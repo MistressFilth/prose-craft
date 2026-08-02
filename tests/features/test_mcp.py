@@ -231,7 +231,7 @@ async def test_mcp_clause_density_check_tool(
     async with mcp_client:
         result = await mcp_client.call_tool(
             "clause_density_check",
-            {"file_path": str(draft), "voice": "dnova"},
+            {"file_path": str(draft)},
         )
         data = _tool_json(result)
         assert "ppc_per_1k" in data
