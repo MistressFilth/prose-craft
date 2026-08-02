@@ -17,6 +17,11 @@
   (`analyst`, `editor`, `architect`, `tune_diction`, `voice_checker`,
   `voice_stylist`, `voice_composer`) that build on first access and
   cache the result.
+- CLI subcommands: `voice check <file> --voice <name>` runs the
+  deterministic three-category voice check (mechanical, statistical,
+  judgments-needed) and renders markdown or `--json`; `voice init <name>`
+  scaffolds a blank `voice.md` from the bundled template. Both honor
+  `--voices-root`.
 
 ### Changed
 - Rewrite as pydantic-ai CLI + FastMCP server. Plugin reduced to thin adapter.

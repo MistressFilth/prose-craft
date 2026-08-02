@@ -28,7 +28,15 @@ from rich.markdown import Markdown
 from prose_craft import __version__
 from prose_craft.config import get_model, get_voices_root
 from prose_craft.orchestrator.root import ProseCraft
-from prose_craft.voices.io import list_voices, read_voice_raw
+from prose_craft.voices.io import list_voices, read_voice, read_voice_raw, write_voice
+from prose_craft.voices.model import (
+    DictionConfig,
+    LexiconConfig,
+    RegisterAxes,
+    RhythmConfig,
+    StructureConfig,
+    SyntaxConfig,
+)
 
 __all__ = ["app", "voice_app"]
 
@@ -248,3 +256,78 @@ def tune_dict(
     )
     for s in result.output.suggestions:
         typer.echo(f"{s.instead_of} -> {s.use}  ({s.note})")
+
+
+@voice_app.command("check")
+def voice_check(
+    file: Path = typer.Argument(..., exists=True),  # noqa: B008
+    voice: str = typer.Option(..., "--voice"),  # noqa: B008
+    tolerance: Literal["strict", "normal", "relaxed"] = typer.Option("normal", "--tolerance"),
+    brief: Path | None = typer.Option(None, "--brief"),  # noqa: B008
+    as_json: bool = typer.Option(False, "--json"),
+    voices_root: Path | None = typer.Option(None, "--voices-root"),
+) -> None:
+    """Run the deterministic voice check on a file."""
+    from prose_craft.voices.check import check_voice
+
+    root = _voices_root_opt(voices_root)
+    profile = read_voice(voice, root=root)
+    text = file.read_text(encoding="utf-8")
+    verdict = check_voice(text, profile, tolerance=tolerance)
+    if as_json:
+        typer.echo(verdict.model_dump_json(indent=2))
+        return
+    lines = [f"# Voice check — {voice}", ""]
+    if verdict.mechanical:
+        lines.append("## Mechanical")
+        for v in verdict.mechanical:
+            loc = f"{file}:{v.line}:{v.col}" if v.line else file
+            lines.append(f"- {loc}  **{v.rule}** — {v.message}")
+    if verdict.statistical:
+        lines.append("")
+        lines.append("## Statistical")
+        for v in verdict.statistical:
+            lines.append(f"- **{v.rule}** — {v.message}")
+    if verdict.judgments_needed:
+        lines.append("")
+        lines.append(f"## Judgments needed ({len(verdict.judgments_needed)})")
+        for j in verdict.judgments_needed:
+            lines.append(f"- {j.rule}")
+    if not (verdict.mechanical or verdict.statistical or verdict.judgments_needed):
+        lines.append("_No findings._")
+    typer.echo("\n".join(lines))
+
+
+@voice_app.command("init")
+def voice_init(
+    name: str = typer.Argument(...),
+    voices_root: Path | None = typer.Option(None, "--voices-root"),
+) -> None:
+    """Scaffold a blank voice.md from the template."""
+    from datetime import date
+
+    from prose_craft.data import load_template
+    from prose_craft.voices.location import voice_path
+    from prose_craft.voices.model import VoiceProfile
+
+    root = _voices_root_opt(voices_root)
+    path = voice_path(name, root=root)
+    if path.exists():
+        raise typer.BadParameter(f"voice {name!r} already exists at {path}")
+    body = load_template()
+    body = body.replace("<name>", name).replace("<voice-name>", name)
+    body = body.replace("<YYYY-MM-DD>", date.today().isoformat())
+    profile = VoiceProfile(
+        voice=name,
+        created=date.today(),
+        updated=date.today(),
+        register=RegisterAxes(),
+        diction=DictionConfig(),
+        rhythm=RhythmConfig(),
+        syntax=SyntaxConfig(),
+        lexicon=LexiconConfig(),
+        structure=StructureConfig(),
+    )
+    prose_body = body.split("---\n", 2)[2] if body.count("---") >= 2 else "\n"
+    write_voice(profile, prose_body, root=root)
+    typer.echo(f"initialized {path}")
