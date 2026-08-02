@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- Voice profile read/write/list (`prose_craft.voices.io`): `read_voice`,
+  `read_voice_raw`, `write_voice`, `list_voices`. Atomic writes
+  (temp file + fsync + rename) with verbatim prose-body preservation.
+  Fixture voice `dnova` lands under `tests/fixtures/voices/`.
+
 ### Changed
 - Rewrite as pydantic-ai CLI + FastMCP server. Plugin reduced to thin adapter.
   Voice profiles moved from `${CLAUDE_PLUGIN_DATA}/voices/` to
