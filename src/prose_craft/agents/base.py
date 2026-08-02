@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Callable, TypeVar
 
-from pydantic import BaseModel
 from pydantic_ai import Agent
 
-T = TypeVar("T", bound=BaseModel)
+T = TypeVar("T")
 
 
 def make_sub_agent(
