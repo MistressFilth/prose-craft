@@ -6,7 +6,7 @@ from pydantic_ai import Agent
 
 from prose_craft.agents.base import make_sub_agent
 from prose_craft.agents.results import DraftResult
-from prose_craft.agents.tools import read_file
+from prose_craft.agents.tools import load_voice, read_file, run_voice_check_tool
 from prose_craft.orchestrator.deps import StylistDeps
 from prose_craft.orchestrator.prompts import VOICE_STYLIST_SYSTEM_PROMPT
 
@@ -17,5 +17,5 @@ def build_voice_stylist(model: str) -> Agent[StylistDeps, DraftResult]:
         model=model,
         output_type=DraftResult,
         system_prompt=VOICE_STYLIST_SYSTEM_PROMPT,
-        tools=[read_file],
+        tools=[read_file, load_voice, run_voice_check_tool],
     )

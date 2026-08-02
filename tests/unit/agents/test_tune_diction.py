@@ -6,10 +6,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pydantic_ai import ModelMessage, ModelResponse, TextPart
+from pydantic_ai import ModelMessage, ModelResponse, RunContext, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.models.test import TestModel
+from pydantic_ai.usage import RunUsage
 
 from prose_craft.agents.tune_diction import build_tune_diction
+from prose_craft.agents.tools import load_voice_diction, read_file
 from prose_craft.orchestrator.deps import TuneDeps
 
 
@@ -18,6 +21,10 @@ def _function_model_returning_json(payload: dict[str, Any]):
         return ModelResponse(parts=[TextPart(json.dumps(payload))])
 
     return FunctionModel(fn)
+
+
+def _make_ctx(deps: Any) -> RunContext[Any]:
+    return RunContext(deps=deps, model=TestModel(), usage=RunUsage())
 
 
 def test_tune_diction_returns_substitution_plan(tmp_path: Path):
@@ -35,3 +42,73 @@ def test_tune_diction_returns_substitution_plan(tmp_path: Path):
         result = agent.run_sync("Tune.", deps=deps)
     assert result.output.suggestions[0].instead_of == "utilize"
     assert result.output.voice_weighted is False
+
+
+def test_tune_diction_toolset_matches_spec():
+    """Per spec: tune_diction gets read_file + load_voice_diction."""
+    agent = build_tune_diction("test")
+    toolset = agent.toolsets[0]
+    assert set(toolset.tools) == {
+        read_file.__name__,
+        load_voice_diction.__name__,
+    }
+
+
+def test_tune_diction_load_voice_diction_tool_runs(tmp_path: Path, monkeypatch):
+    """load_voice_diction reads the voice profile and returns its diction block."""
+    voice_dir = tmp_path / "voices" / "dnova"
+    voice_dir.mkdir(parents=True)
+    voice_md = voice_dir / "voice.md"
+    voice_md.write_text(
+        "---\n"
+        "voice: dnova\n"
+        "version: 1\n"
+        "created: 2026-01-01\n"
+        "updated: 2026-01-01\n"
+        "register:\n"
+        "  funny_serious: 0.5\n"
+        "diction:\n"
+        "  default_balance: 'germanic-leaning'\n"
+        "  banned: ['utilize']\n"
+        "  preferred: []\n"
+        "  germanic_for: []\n"
+        "  latinate_for: []\n"
+        "  inherit_lexicons: []\n"
+        "rhythm:\n"
+        "  target_mean_sentence: null\n"
+        "  target_variation: null\n"
+        "  paragraph_shape: null\n"
+        "  one_sentence_paragraphs: null\n"
+        "  forbidden_patterns: []\n"
+        "syntax:\n"
+        "  em_dashes: null\n"
+        "  colons: null\n"
+        "  semicolons: null\n"
+        "  parentheticals: null\n"
+        "  fragments: null\n"
+        "  bullets: null\n"
+        "  questions: null\n"
+        "lexicon:\n"
+        "  pet_phrases: []\n"
+        "  characteristic_openers: []\n"
+        "  characteristic_closers: []\n"
+        "  taboo_phrases: []\n"
+        "structure:\n"
+        "  opening: null\n"
+        "  closing: null\n"
+        "  transitions: null\n"
+        "  emphasis: null\n"
+        "  citations: null\n"
+        "---\n"
+        "body\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path / "voices"))
+    agent = build_tune_diction("test")
+    toolset = agent.toolsets[0]
+    tool = toolset.tools[load_voice_diction.__name__]
+    ctx = _make_ctx(TuneDeps(file_path=tmp_path / "prose.md"))
+    payload = json.loads(tool.function(ctx, "dnova"))
+    assert payload["default_balance"] == "germanic-leaning"
+    assert payload["banned"] == ["utilize"]
+    assert "preferred" in payload
