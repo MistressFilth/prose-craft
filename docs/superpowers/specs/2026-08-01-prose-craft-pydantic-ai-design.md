@@ -75,7 +75,7 @@ No top-level `run(command)` method. The orchestrator is constructed, the right a
 | `tune_diction` | Haiku | `TuneDeps` | `SubstitutionPlan` | tools: `read_file`, `load_voice_diction` |
 | `voice_checker` | Haiku | `VoiceDeps` | `VoiceVerdict` | tools: `read_file`, `load_voice` |
 | `voice_stylist` | Sonnet | `StylistDeps` | `DraftResult` | tools: `read_file`, `load_voice`, `run_voice_check_tool` |
-| `voice_composer` | Opus | `ComposerDeps` | `list[VoiceDelta]` | tools: `read_voice`, `write_voice`, `list_voices`, `apply_voice_delta`; capability: `Memory` |
+| `voice_composer` | Opus | `ComposerDeps` | `list[VoiceDelta]` | tools: `load_voice`, `read_voice`, `write_voice`, `list_voices`, `apply_voice_delta`; capability: `Memory` |
 
 All agent tools are pure-Python wrappers over the analysis/voices modules. No tool makes a network call except via the model.
 
