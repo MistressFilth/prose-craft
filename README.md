@@ -8,7 +8,7 @@ A `pydantic-ai` engine for designing and applying prose voices.
 - **FastMCP server** (`prose mcp`) over stdio, exposing the engine as
   tools and resources to any MCP host.
 - **Voice profiles** at `$XDG_DATA_HOME/prose-craft/voices/<name>/voice.md`.
-- **Claude Code plugin** at `plugin/` is a thin adapter over the engine.
+- **Claude Code plugin** at `claude-code/plugin/` is a thin adapter over the engine.
 
 ## Install
 
@@ -55,7 +55,7 @@ The old directory is left untouched; delete the new one to roll back.
 claude mcp add --transport stdio prose-craft -- uv run --project . prose-craft mcp
 ```
 
-The plugin in `plugin/` is registered the same way as before and now
+The plugin in `claude-code/plugin/` is registered the same way as before and now
 depends on the MCP server for its tools.
 
 ## Architecture

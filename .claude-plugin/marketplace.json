@@ -5,6 +5,6 @@
   "description": "pydantic-ai engine for designing and applying prose voices, with a thin Claude Code plugin adapter.",
   "owner": { "name": "MistressFilth" },
   "plugins": [
-    { "name": "prose-craft", "source": "./plugin/" }
+    { "name": "prose-craft", "source": "./claude-code/plugin/" }
   ]
 }
