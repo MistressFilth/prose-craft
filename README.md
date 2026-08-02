@@ -1,5 +1,7 @@
 # prose-craft
 
+[![Checks](https://github.com/MistressFilth/prose-craft/actions/workflows/check.yml/badge.svg)](https://github.com/MistressFilth/prose-craft/actions/workflows/check.yml)
+
 A `pydantic-ai` engine for designing and applying prose voices.
 
 - **Typer CLI** (`prose`) with subcommands for analyze, edit,
@@ -73,10 +75,14 @@ notes directory (`@AGENTS.local.md`); see the spec and plan under
 ## Development
 
 ```bash
-make test     # unit + features
-make check    # lint, typecheck, format
+make test         # unit + features tests
+make check        # lint, typecheck, format
+make format       # auto-fix lint/format findings
+pre-commit run --all-files   # run the full pre-commit suite locally
 ```
 
-## License
+## Project links
 
-GPL-2.0.
+- [Changelog](CHANGELOG.md)
+- [Agent instructions](AGENTS.md)
+- [License](LICENSE) (GPL-2.0)
