@@ -15,10 +15,12 @@ agents load.
 
 ## Voice profile schema
 
-Every voice lives at `${CLAUDE_PLUGIN_DATA}/voices/<name>/voice.md`
+Every voice lives at `$XDG_DATA_HOME/prose-craft/voices/<name>/voice.md`
 as a single file with YAML front-matter and an optional prose body.
 Agents read and write the front-matter via `src/prose_craft/voices/io.py`
 (pyyaml preserves the prose body verbatim).
+
+Migration: run `prose migrate voices` to copy profiles from the old plugin-data location.
 
 Top-level keys, in fixed order:
 

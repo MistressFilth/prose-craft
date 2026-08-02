@@ -16,9 +16,11 @@ Read the first two for ground truth. Read this one to design well.
 
 A voice profile is a constitution. The `voice-stylist` agent treats every rule the profile states as binding and falls back to the `literary-editor` output style wherever the profile stays silent.
 
+Migration: run `prose migrate voices` to copy profiles from the old plugin-data location.
+
 Three layers carry the work:
 
-1. **The voice profile** — `voice.md` plus optional depth files, living at `${CLAUDE_PLUGIN_DATA}/voices/<name>/`. This is where you write the constitution.
+1. **The voice profile** — `voice.md` plus optional depth files, living at `$XDG_DATA_HOME/prose-craft/voices/<name>/`. This is where you write the constitution.
 2. **The skills** — `/draft-in-voice` and the `voice-contract` it loads. They run one drafting session: read the profile, pass the brief to the stylist, run `prose voice check` after.
 3. **The agents** — `voice-composer` authors profiles (Opus), `voice-stylist` drafts and edits (Opus), `voice-checker` reports violations read-only (Sonnet).
 
@@ -28,7 +30,7 @@ One fact about this architecture governs every design decision below: **the styl
 
 ## The family as a worked example
 
-The plugin ships seventeen voices under `${CLAUDE_PLUGIN_DATA}/voices/discordian-*/`. Open them; they are the clearest teacher this guide can point to.
+The plugin ships seventeen voices under `$XDG_DATA_HOME/prose-craft/voices/discordian-*/`. Open them; they are the clearest teacher this guide can point to.
 
 **Shape.** One parent, `discordian-base`, and sixteen children — `deredere`, `tsundere`, `yandere`, `kuudere`, `dandere`, `kawaii`, `goth`, `fairy`, `cryptid`, `surfer`, `alien`, `bureaucratic`, `classic`, `composed`, `fnord`, `saturated`. Every child declares `base: discordian-base`. The base declares `base: null`. The tree is flat — parent and children, one level, because the schema permits exactly one.
 
@@ -279,14 +281,14 @@ A long persona that reads like directions ("write like X, never do Y") produces 
 
 To see the discipline in production, read in order:
 
-1. `${CLAUDE_PLUGIN_DATA}/voices/discordian-deredere/voice.md` — the `structure.opening:` escalator with its preserved register description.
-2. `${CLAUDE_PLUGIN_DATA}/voices/discordian-deredere/exemplars/postcard.md` — the register-anchor with the matching failure-mode list.
+1. `$XDG_DATA_HOME/prose-craft/voices/discordian-deredere/voice.md` — the `structure.opening:` escalator with its preserved register description.
+2. `$XDG_DATA_HOME/prose-craft/voices/discordian-deredere/exemplars/postcard.md` — the register-anchor with the matching failure-mode list.
 
 Deredere was the test subject for all four rounds; the other fifteen voices received the discipline as a one-shot rollout. Author it from the start and your voice skips the iteration entirely.
 
 ### G20 — Back up before every voice change
 
-Voice editing is iterative and rollback is cheap. Before each change, copy the voice directory to a timestamped sibling under `${CLAUDE_PLUGIN_DATA}/voices/.backups/<timestamp>-<change-name>/`. Recover with a reverse copy. The family's iteration accumulated a backup per state change, and every one of them earned its keep at least once.
+Voice editing is iterative and rollback is cheap. Before each change, copy the voice directory to a timestamped sibling under `$XDG_DATA_HOME/prose-craft/voices/.backups/<timestamp>-<change-name>/`. Recover with a reverse copy. The family's iteration accumulated a backup per state change, and every one of them earned its keep at least once.
 
 ### G21 — Self-description is not evidence of tell-profile
 
@@ -375,5 +377,5 @@ Add a section when you hit a failure mode the gotchas do not name, discover an a
 - `src/prose_craft/voices/io.py` — the `Voice` model, the `DepthKind` literal, the override chain.
 - `src/prose_craft/voices/check.py` — the mechanical, statistical, and TEX-shape checks; the `effective_diction()` bank union.
 - `prose/agents/voice-stylist.md`, `voice-composer.md`, `voice-checker.md` — the agent definitions and their drafting protocols.
-- `${CLAUDE_PLUGIN_DATA}/voices/discordian-*/` — the seventeen-voice family this guide draws its examples from; `discordian-base` for inheritance, `discordian-deredere` for the opener discipline.
+- `$XDG_DATA_HOME/prose-craft/voices/discordian-*/` — the seventeen-voice family this guide draws its examples from; `discordian-base` for inheritance, `discordian-deredere` for the opener discipline.
 

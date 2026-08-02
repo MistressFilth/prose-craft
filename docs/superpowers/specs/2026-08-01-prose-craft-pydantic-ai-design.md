@@ -231,7 +231,7 @@ Default `src`: `$CLAUDE_PLUGIN_DATA/voices`. Default `dst`: XDG root. Source nev
 | `prose tune-diction <file> [--voice <name>]` | Run tune-diction agent; prints substitution plan |
 | `prose voice list` | List every voice under the active root |
 | `prose voice show <name> [--raw]` | Print voice profile as markdown (or raw file) |
-| `prose voice check <file> --voice <name> [--tolerance ...] [--brief <brief.md>]` | Run deterministic voice check; JSON output with `--json` |
+| `prose voice check <file> --voice <name> [--tolerance ...]` | Run deterministic voice check; JSON output with `--json` |
 | `prose voice compose <name>` | REPL wizard; resumable from disk |
 | `prose voice refine <name> [dim]` | REPL wizard for a single dimension (or all unanswered) |
 | `prose voice draft <name> <brief> [--to <output>]` | Run stylist agent in draft mode |
@@ -254,7 +254,7 @@ Ten elements over stdio.
 | `analyze_prose(file_path, voice?, tolerance?, metrics_only?)` | tool | Analyst when `metrics_only=False`; deterministic primitives when `metrics_only=True`. Returns `ProseDiagnostic` as JSON. |
 | `voice_check(file_path, voice, tolerance?, brief_path?)` | tool | Deterministic voice check. Returns `VoiceVerdict` as JSON. |
 | `dispersion_check(new_draft_path, siblings)` | tool | Cross-draft scoring. Returns `DispersionProfile` as JSON. |
-| `clause_density_check(file_path, voice, surface?)` | tool | Passive + participial density. Returns `ClauseDensityResult` as JSON. |
+| `clause_density_check(file_path)` | tool | Passive + participial density. Returns `ClauseDensityResult` as JSON. |
 | `edit_prose(file_path, voice?, tolerance?)` | tool | Editor agent. Returns `EditResult` as JSON. |
 | `architect_prose(file_path, voice?)` | tool | Architect agent. Returns `ArchitectResult` as JSON. |
 | `tune_diction(file_path, voice?)` | tool | Tune-diction agent. Returns `SubstitutionPlan` as JSON. |
