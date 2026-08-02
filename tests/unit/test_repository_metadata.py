@@ -13,9 +13,7 @@ def test_version_surfaces_match() -> None:
     plugin = json.loads(
         (ROOT / "claude-code/plugin/.claude-plugin/plugin.json").read_text(encoding="utf-8")
     )
-    marketplace = json.loads(
-        (ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8")
-    )
+    marketplace = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
 
     assert 'version = "0.2.0"' in pyproject
     assert '__version__ = "0.2.0"' in runtime
@@ -25,9 +23,7 @@ def test_version_surfaces_match() -> None:
 
 
 def test_marketplace_points_to_standard_plugin_layout() -> None:
-    marketplace = json.loads(
-        (ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8")
-    )
+    marketplace = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
 
     assert marketplace["plugins"][0]["source"] == "./claude-code/plugin/"
     assert (ROOT / marketplace["plugins"][0]["source"][2:]).is_dir()
