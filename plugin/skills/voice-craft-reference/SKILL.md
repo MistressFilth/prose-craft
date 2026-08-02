@@ -15,10 +15,12 @@ agents load.
 
 ## Voice profile schema
 
-Every voice lives at `${CLAUDE_PLUGIN_DATA}/voices/<name>/voice.md`
+Every voice lives at `$XDG_DATA_HOME/prose-craft/voices/<name>/voice.md`
 as a single file with YAML front-matter and an optional prose body.
-Agents read and write the front-matter via `scripts/voice_io.py`
+Agents read and write the front-matter via `src/prose_craft/voices/io.py`
 (pyyaml preserves the prose body verbatim).
+
+Migration: run `prose migrate voices` to copy profiles from the old plugin-data location.
 
 Top-level keys, in fixed order:
 
@@ -127,7 +129,7 @@ fallbacks:
 After the closing `---`, an optional prose body (D10) holds the
 writer's articulation of the voice — short "this voice is X" claims
 with one-sentence elaborations. The body is guidance the agents
-read; the YAML is what `voice_check.py` checks.
+read; the YAML is what `prose voice check` checks.
 
 ## Structure shape: opener discipline
 
@@ -349,7 +351,7 @@ NN/g's research finds extremes rarely work in practice.
 The top-level `attributions:` list is the canonical record of which YAML fields or rule IDs came from which named third-party source. Voice-composer appends
 one entry per accepted preset; voice-stylist reads the list at draft time to honor "attribute on first use" within drafts.
 
-YAML comments in `voice.md` (e.g. `# Source: Microsoft`) do not round-trip through `voice_io.py` — pyyaml's `safe_dump` strips them. The structured
+YAML comments in `voice.md` (e.g. `# Source: Microsoft`) do not round-trip through `src/prose_craft/voices/io.py` — pyyaml's `safe_dump` strips them. The structured
 `attributions:` list is the only attribution form that persists.
 
 A voice with an empty or missing `attributions:` list is treated as fully writer-authored; voice-stylist falls back to its own judgment from the License
@@ -435,7 +437,7 @@ the `voice-contract` skill § "Audience resolution."
 
 ## Rule taxonomy summary
 
-`scripts/voice_check.py` classifies every YAML field as **mechanical**
+`src/prose_craft/voices/check.py` classifies every YAML field as **mechanical**
 (string/regex match), **statistical** (count and compare to target),
 or **agent-required** (model judges). The full taxonomy lives in the
 planning workspace at `05-voice-checker-rules.md` and is replicated

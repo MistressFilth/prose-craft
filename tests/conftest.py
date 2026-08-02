@@ -1,8 +1,15 @@
-import sys
+"""Shared pytest fixtures."""
+
+from __future__ import annotations
+
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent
-for _sub in ("plugin/scripts", "plugin/hooks"):
-    _p = str(_ROOT / _sub)
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+import pytest
+
+
+@pytest.fixture
+def tmp_voices_root(tmp_path: Path) -> Path:
+    """An isolated voices root for the duration of one test."""
+    root = tmp_path / "voices"
+    root.mkdir()
+    return root

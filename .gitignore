@@ -1,8 +1,20 @@
-*.py[cod]
+.venv/
 __pycache__/
+*.py[cod]
+.pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.claude/settings.local.json
-.venv/
+dist/
+build/
+*.egg-info/
 .superpowers/
-.pytest_cache/
+.superpowers.json
+
+# Pre-existing planning artifacts (kept locally, not shipped)
+docs/superpowers/drafts/
+docs/superpowers/plans/2026-07-26-*
+docs/superpowers/specs/2026-07-26-*
+
+# Harness artifacts
+AGENTS.local.md
+.claude/settings.local.json
