@@ -11,6 +11,12 @@
   Pydantic dep models consumed by every agent: `AnalysisDeps`,
   `EditorDeps`, `ArchitectDeps`, `TuneDeps`, `VoiceDeps`, `StylistDeps`,
   `ComposerDeps`. Tolerance and stylist-mode are typed literals.
+- `ProseCraft` composition root (`prose_craft.orchestrator.root`):
+  constructed once per CLI/MCP/plugin invocation, owns model selection,
+  voices-root, and log level. Exposes seven lazy agent accessors
+  (`analyst`, `editor`, `architect`, `tune_diction`, `voice_checker`,
+  `voice_stylist`, `voice_composer`) that build on first access and
+  cache the result.
 
 ### Changed
 - Rewrite as pydantic-ai CLI + FastMCP server. Plugin reduced to thin adapter.
