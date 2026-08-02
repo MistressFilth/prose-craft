@@ -7,6 +7,10 @@
   `read_voice_raw`, `write_voice`, `list_voices`. Atomic writes
   (temp file + fsync + rename) with verbatim prose-body preservation.
   Fixture voice `MistressFilth` lands under `tests/fixtures/voices/`.
+- Orchestrator package (`prose_craft.orchestrator`) with shared
+  Pydantic dep models consumed by every agent: `AnalysisDeps`,
+  `EditorDeps`, `ArchitectDeps`, `TuneDeps`, `VoiceDeps`, `StylistDeps`,
+  `ComposerDeps`. Tolerance and stylist-mode are typed literals.
 
 ### Changed
 - Rewrite as pydantic-ai CLI + FastMCP server. Plugin reduced to thin adapter.
