@@ -13,11 +13,14 @@ Subcommands:
 * ``voice check`` — run the deterministic voice check (mechanical,
   statistical, judgments-needed) and render markdown or ``--json``.
 * ``voice init`` — scaffold a blank voice.md from the template.
+* ``voice compose`` — interactive REPL to design a voice profile.
+* ``voice refine`` — alias of ``voice compose`` for iterating on an
+  existing profile; the ``dim`` argument is reserved for future
+  per-dimension refinement and is ignored today.
+* ``voice draft`` — run the voice-stylist agent in draft mode.
+* ``voice edit`` — run the voice-stylist agent in edit mode against a file.
 * ``migrate voices`` — copy voice profiles from a legacy location to the
   XDG root.
-
-Subsequent CLI tasks (32) will add ``voice compose``/``voice refine``/
-``voice draft``/``voice edit`` under the same ``voice`` sub-typer.
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from prose_craft import __version__
+from prose_craft.agents.results import VoiceDelta
 from prose_craft.config import get_model, get_voices_root
 from prose_craft.orchestrator.root import ProseCraft
 from prose_craft.voices.io import list_voices, read_voice, read_voice_raw, write_voice
@@ -335,6 +339,183 @@ def voice_init(
     prose_body = body.split("---\n", 2)[2] if body.count("---") >= 2 else "\n"
     write_voice(profile, prose_body, root=root)
     typer.echo(f"initialized {path}")
+
+
+def _apply_delta(payload: dict[str, Any], delta: VoiceDelta) -> None:
+    """Apply a VoiceDelta to a serialized VoiceProfile payload."""
+    if "." in delta.field:
+        top, sub = delta.field.split(".", 1)
+        payload.setdefault(top, {})
+        if isinstance(payload[top], dict):
+            payload[top][sub] = delta.value
+    else:
+        payload[delta.field] = delta.value
+
+
+def _voice_compose_repl(name: str, root: Path) -> None:
+    """Walk a writer through composing a voice, one dimension at a time."""
+    from datetime import date
+
+    from prose_craft.data import load_template
+    from prose_craft.orchestrator.deps import ComposerDeps
+    from prose_craft.voices.model import (
+        DictionConfig,
+        LexiconConfig,
+        RegisterAxes,
+        RhythmConfig,
+        StructureConfig,
+        SyntaxConfig,
+        VoiceProfile,
+    )
+
+    try:
+        profile, body = read_voice_raw(name, root=root)
+    except Exception:
+        # Initialize from template.
+        body = load_template()
+        body = body.replace("<name>", name).replace("<voice-name>", name)
+        body = body.replace("<YYYY-MM-DD>", date.today().isoformat())
+        profile = VoiceProfile(
+            voice=name,
+            created=date.today(),
+            updated=date.today(),
+            register=RegisterAxes(),
+            diction=DictionConfig(),
+            rhythm=RhythmConfig(),
+            syntax=SyntaxConfig(),
+            lexicon=LexiconConfig(),
+            structure=StructureConfig(),
+        )
+
+    fields = [
+        "purpose",
+        "audience",
+        "register",
+        "diction",
+        "rhythm",
+        "syntax",
+        "lexicon",
+        "structure",
+        "never",
+    ]
+    field_index = 0
+    craft = ProseCraft()
+    agent = craft.voice_composer()
+
+    while field_index < len(fields):
+        current = fields[field_index]
+        typer.echo(f"\n[{current}]")
+        prompt_text = typer.prompt("(answer) ", default="", show_default=False)
+        if prompt_text.strip().lower() in ("done", "exit", "quit"):
+            break
+        result = agent.run_sync(
+            prompt_text or "next",
+            deps=ComposerDeps(
+                name=name,
+                current_field=current,
+                profile=profile.model_dump(mode="json"),
+            ),
+        )
+        deltas = result.output
+        if not deltas:
+            field_index += 1
+            continue
+        for d in deltas:
+            typer.echo(f"  proposed {d.field} = {d.value!r}  ({d.prompt})")
+        ans = typer.prompt("(accept / modify / decline / skip)", default="accept")
+        if ans.startswith("a"):
+            payload = profile.model_dump(mode="json")
+            for d in deltas:
+                _apply_delta(payload, d)
+            payload["updated"] = date.today().isoformat()
+            profile = VoiceProfile.model_validate(payload)
+            write_voice(profile, body, root=root)
+            field_index += 1
+        elif ans.startswith("s"):
+            continue
+        # modify / decline do not advance; user can re-prompt
+
+
+@voice_app.command("compose")
+def voice_compose(
+    name: str = typer.Argument(...),
+    voices_root: Path | None = typer.Option(None, "--voices-root"),
+) -> None:
+    """Interactive REPL: walk the writer through composing a voice."""
+    root = _voices_root_opt(voices_root)
+    _voice_compose_repl(name, root)
+
+
+@voice_app.command("refine")
+def voice_refine(
+    name: str = typer.Argument(...),
+    dim: str | None = typer.Argument(
+        None,
+        help="Reserved for future per-dimension refinement. Currently ignored.",
+    ),
+    voices_root: Path | None = typer.Option(None, "--voices-root"),
+) -> None:
+    """Refine a voice profile (alias of ``voice compose``).
+
+    Currently walks all dimensions in fixed order; the ``dim`` argument is
+    reserved for a future per-dimension walk and is ignored today.
+    """
+    voice_compose(name=name, voices_root=voices_root)
+
+
+@voice_app.command("draft")
+def voice_draft(
+    name: str = typer.Argument(...),
+    brief: str = typer.Argument(..., help="The brief to write to."),
+    to: Path | None = typer.Option(None, "--to", help="Output file; defaults to stdout."),
+    voices_root: Path | None = typer.Option(None, "--voices-root"),
+) -> None:
+    """Draft prose in the named voice."""
+    import tempfile
+
+    from prose_craft.orchestrator.deps import StylistDeps
+
+    _voices_root_opt(voices_root)  # honor the override for env consistency
+    # The stylist reads/writes the target file. The CLI seeds an empty
+    # file at --to if given; the agent writes into it.
+    if to is not None:
+        to.parent.mkdir(parents=True, exist_ok=True)
+        to.touch()
+        file_path = to
+    else:
+        # Use a tmp path; the agent's text is printed to stdout.
+        with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as tmp:
+            file_path = Path(tmp.name)
+            file_path.write_text("", encoding="utf-8")
+
+    craft = ProseCraft()
+    result = craft.voice_stylist().run_sync(
+        f"Draft prose in voice {name!r}. Brief: {brief}",
+        deps=StylistDeps(file_path=file_path, voice_name=name, brief=brief, mode="draft"),
+    )
+    if to is None:
+        typer.echo(result.output.text)
+
+
+@voice_app.command("edit")
+def voice_edit(
+    file: Path = typer.Argument(..., exists=True),  # noqa: B008
+    voice: str = typer.Option(..., "--voice"),  # noqa: B008
+    in_place: bool = typer.Option(False, "--in-place"),
+    voices_root: Path | None = typer.Option(None, "--voices-root"),
+) -> None:
+    """Edit a file in the named voice."""
+    from prose_craft.orchestrator.deps import StylistDeps
+
+    _voices_root_opt(voices_root)  # validate root exists
+    craft = ProseCraft()
+    result = craft.voice_stylist().run_sync(
+        "Edit this prose in the named voice.",
+        deps=StylistDeps(file_path=file, voice_name=voice, mode="edit"),
+    )
+    if in_place and result.output.text:
+        file.write_text(result.output.text, encoding="utf-8")
+    typer.echo(result.output.change_log or "(no change log)")
 
 
 migrate_app = typer.Typer(help="Migration helpers.")
