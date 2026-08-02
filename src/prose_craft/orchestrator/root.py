@@ -80,7 +80,7 @@ class ProseCraft:
         return self._lazy("analyst", lambda: build_analyst(self.model))
 
     def editor(self) -> Agent[EditorDeps, EditResult]:
-        from prose_craft.agents.editor import build_editor  # type: ignore[import-untyped]
+        from prose_craft.agents.editor import build_editor
 
         return self._lazy("editor", lambda: build_editor(self.model))
 
