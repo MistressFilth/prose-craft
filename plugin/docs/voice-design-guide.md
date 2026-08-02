@@ -19,7 +19,7 @@ A voice profile is a constitution. The `voice-stylist` agent treats every rule t
 Three layers carry the work:
 
 1. **The voice profile** — `voice.md` plus optional depth files, living at `${CLAUDE_PLUGIN_DATA}/voices/<name>/`. This is where you write the constitution.
-2. **The skills** — `/draft-in-voice` and the `voice-contract` it loads. They run one drafting session: read the profile, pass the brief to the stylist, run `voice_check.py` after.
+2. **The skills** — `/draft-in-voice` and the `voice-contract` it loads. They run one drafting session: read the profile, pass the brief to the stylist, run `prose voice check` after.
 3. **The agents** — `voice-composer` authors profiles (Opus), `voice-stylist` drafts and edits (Opus), `voice-checker` reports violations read-only (Sonnet).
 
 One fact about this architecture governs every design decision below: **the stylist composes one draft at a time and remembers nothing of the drafts before it.** Each draft meets the constitution fresh. Every convergence problem in this guide traces back to that single fact, and so does every fix.
@@ -48,7 +48,7 @@ A voice needs a way to reach for the right words. The plugin supports two, and t
 
 The schema-native path. A voice ships phrase lists as depth files the drafter draws from:
 
-- A **bank** backs one lexicon field (`lexicon.pet_phrases`, say). It declares `selection:` (`random` / `random-dedup` / `weighted-dedup`) and `exhaustion:` (`cycle` / `vice-prefix` / `error`). The drafter samples per those rules; `voice_check.py` unions banked phrases with inline ones through `effective_diction()` before its density pass, so the checker sees the same pool the drafter draws from.
+- A **bank** backs one lexicon field (`lexicon.pet_phrases`, say). It declares `selection:` (`random` / `random-dedup` / `weighted-dedup`) and `exhaustion:` (`cycle` / `vice-prefix` / `error`). The drafter samples per those rules; `prose voice check` unions banked phrases with inline ones through `effective_diction()` before its density pass, so the checker sees the same pool the drafter draws from.
 - A **well** is a register vocabulary pool feeding the texture moves it names in `serves:`. When it also declares `gated_by:`, its vocabulary enters the draft's working set only once the effective dial clears that threshold.
 
 Use this model when the voice has signature phrases that should **rotate** — variety across drafts, governed mechanically.
@@ -59,7 +59,7 @@ The path the discordian family actually took. Instead of phrase pools, the voice
 
 > "The drafter ACTIVATES training-data territory rather than selecting from phrase pools. There are no banks and no wells in this voice family."
 
-Two keys carry it, both read by the agents as prose (they are freeform front-matter, outside the checked schema — `voice_check.py` does not parse them):
+Two keys carry it, both read by the agents as prose (they are freeform front-matter, outside the checked schema — `prose voice check` does not parse them):
 
 - **`voice_persona:`** — one paragraph naming the author or register whose engine the voice channels. It is a training-data prior, not an instruction set. "Channel Mary Ruefle's notes plus the warmer corners of Annie Dillard" activates more than a page of rules (see G18).
 - **`lore_corpus:`** — the family's structured territory map: named registers, source corpora, and the improvisation constraints that keep activation from sliding into retrieval.
@@ -189,7 +189,7 @@ density_ceiling: 10          # at most this many TEX moves per 1k words
 strip_test_pass_rate: 0.7    # >=70% of deployed moves must pass the strip test
 ```
 
-`voice_check.py` counts candidates for four shapes — **TEX-1** (the em-dash aside), **TEX-7** (the terminal triplet, "X, Y, and Z"), **TEX-8** (the anaphoric build, "not this, not that, but the thing itself"), and **TEX-9** (the aphoristic close, a short sentence after a long one) — then asks the harder question with three diagnostics:
+`prose voice check` counts candidates for four shapes — **TEX-1** (the em-dash aside), **TEX-7** (the terminal triplet, "X, Y, and Z"), **TEX-8** (the anaphoric build, "not this, not that, but the thing itself"), and **TEX-9** (the aphoristic close, a short sentence after a long one) — then asks the harder question with three diagnostics:
 
 - **The strip test.** Remove the sentence. If a literally-true claim about the subject still lands, the sentence was decoration. If the draft loses something true, it was load-bearing. The checker reports a `strip_test_pass_rate`; the floor above wants 0.7.
 - **Bold overlap.** Cosmic register belongs on small subjects, not on the document's main claim — which earns the bold. A textured sentence sitting inside a bold span is a near-certain misplacement.
@@ -237,7 +237,7 @@ A `|` block scalar preserves newlines, so an authored phrase can wrap across two
 
 ### G9 — The stylist receives no prior-draft context
 
-`/draft-in-voice` passes one brief; it never globs sibling drafts, and `voice_check.py` reads one file. Within a session, bank rotation (`random-dedup`) holds. Across sessions, it does not — that is genuinely net-new architecture (glob prior drafts, extract the recurring beat, pass it as an anti-pattern). Do not expect the voice profile alone to rotate across invocations.
+`/draft-in-voice` passes one brief; it never globs sibling drafts, and `prose voice check` reads one file. Within a session, bank rotation (`random-dedup`) holds. Across sessions, it does not — that is genuinely net-new architecture (glob prior drafts, extract the recurring beat, pass it as an anti-pattern). Do not expect the voice profile alone to rotate across invocations.
 
 ### G10 — Banks are positive pools; there is no anti-bank
 
@@ -356,7 +356,7 @@ The constitution layer has a ceiling. These signals mean you have reached it, an
 | You want to forbid "phrases used in the last N drafts" | A dynamic anti-bank: a prior-draft log the stylist reads as anti-pattern |
 | You want `random-dedup` to span sessions | Persistent per-voice dedup state a skill reads at dispatch |
 | Shared infrastructure that single-level inheritance cannot promote | More aggressive promotion to the base, or a second inheritance level |
-| The checker should detect frame-level recurrence | Pattern detection extended in `voice_check.py` |
+| The checker should detect frame-level recurrence | Pattern detection extended in `prose voice check` |
 
 Pursue these when a writer's real experience proves the ceiling, not before. The deredere iteration reached the ceiling at round four and named cross-draft awareness as the next step — but the reading experience said the residual recurrence read as signature, so the family shipped without the extension. Do the same calculus for your voice.
 
@@ -372,8 +372,8 @@ Add a section when you hit a failure mode the gotchas do not name, discover an a
 
 - `prose/skills/voice-craft-reference/SKILL.md` — the schema: D1-D10, the six-axis register, the depth-kind list, the exemplar and lexicon shapes.
 - `prose/skills/voice-contract/SKILL.md` — the operations: rule precedence, the depth-file walk, dial computation, base inheritance, audience resolution.
-- `prose/scripts/voice_io.py` — the `Voice` model, the `DepthKind` literal, the override chain.
-- `prose/scripts/voice_check.py` — the mechanical, statistical, and TEX-shape checks; the `effective_diction()` bank union.
+- `src/prose_craft/voices/io.py` — the `Voice` model, the `DepthKind` literal, the override chain.
+- `src/prose_craft/voices/check.py` — the mechanical, statistical, and TEX-shape checks; the `effective_diction()` bank union.
 - `prose/agents/voice-stylist.md`, `voice-composer.md`, `voice-checker.md` — the agent definitions and their drafting protocols.
 - `${CLAUDE_PLUGIN_DATA}/voices/discordian-*/` — the seventeen-voice family this guide draws its examples from; `discordian-base` for inheritance, `discordian-deredere` for the opener discipline.
 
