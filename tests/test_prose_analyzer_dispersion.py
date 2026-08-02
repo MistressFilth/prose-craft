@@ -120,9 +120,7 @@ def _run_main_with_payload(monkeypatch, file_path):
     monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
 
 
-def test_main_emits_message_when_voice_clean_but_dispersion_nonempty(
-    tmp_path, monkeypatch, capsys
-):
+def test_main_emits_message_when_voice_clean_but_dispersion_nonempty(tmp_path, monkeypatch, capsys):
     """Clean voice check (empty voice section) + real siblings (non-empty
     dispersion section) must still surface a systemMessage -- the hook
     should not exit silently just because the voice section alone is

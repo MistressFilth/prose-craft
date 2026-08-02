@@ -154,9 +154,7 @@ def test_compute_reference_skips_records_missing_a_key():
     assert reference["mean_agentless_passive_per_1k"] == pytest.approx(2.0)
 
 
-def test_main_cli_no_surface_has_null_reference_and_writes_nothing(
-    tmp_path, monkeypatch, capsys
-):
+def test_main_cli_no_surface_has_null_reference_and_writes_nothing(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
     draft = tmp_path / "draft.md"
     draft.write_text(PLAIN)
@@ -167,9 +165,7 @@ def test_main_cli_no_surface_has_null_reference_and_writes_nothing(
     assert not (tmp_path / "clause_density_history").exists()
 
 
-def test_main_cli_with_surface_first_draft_has_n_zero_reference(
-    tmp_path, monkeypatch, capsys
-):
+def test_main_cli_with_surface_first_draft_has_n_zero_reference(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
     draft = tmp_path / "draft1.md"
     draft.write_text(PPC_DENSE)
@@ -182,9 +178,7 @@ def test_main_cli_with_surface_first_draft_has_n_zero_reference(
     assert records[0]["ppc_per_1k"] == pytest.approx(out["draft"]["ppc_per_1k"])
 
 
-def test_main_cli_second_draft_compares_against_first_not_itself(
-    tmp_path, monkeypatch, capsys
-):
+def test_main_cli_second_draft_compares_against_first_not_itself(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
     draft1 = tmp_path / "draft1.md"
     draft1.write_text(PPC_DENSE)
@@ -198,8 +192,6 @@ def test_main_cli_second_draft_compares_against_first_not_itself(
     out = json.loads(capsys.readouterr().out)
     assert out["reference"]["n"] == 1
     first_measured = CD.measure_clause_density(PPC_DENSE)
-    assert out["reference"]["mean_ppc_per_1k"] == pytest.approx(
-        first_measured["ppc_per_1k"]
-    )
+    assert out["reference"]["mean_ppc_per_1k"] == pytest.approx(first_measured["ppc_per_1k"])
     records = CD.read_history("kuudere", "verification_log")
     assert len(records) == 2

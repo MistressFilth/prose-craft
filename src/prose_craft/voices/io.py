@@ -4,6 +4,7 @@ The on-disk format is YAML front-matter between ``---`` markers,
 followed by a prose body. PyYAML parses the front-matter; the rest of
 the file is preserved verbatim by ``write_voice``.
 """
+
 from __future__ import annotations
 
 import os
@@ -31,9 +32,7 @@ class VoiceSummary(BaseModel):
     updated: date
 
 
-_FRONTMATTER_RE = re.compile(
-    r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL
-)
+_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
 
 
 def read_voice(name: str, *, root: Path | None = None) -> "VoiceProfile":
@@ -115,9 +114,7 @@ def write_voice(
     body = prose_body if prose_body.startswith("\n") else "\n" + prose_body
     full = f"---\n{front_matter}---{body}"
 
-    fd, tmp_name = tempfile.mkstemp(
-        dir=path.parent, prefix=".voice.", suffix=".md.tmp"
-    )
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=".voice.", suffix=".md.tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(full)

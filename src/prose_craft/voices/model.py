@@ -4,6 +4,7 @@ Mirrors the D1-D10 + audiences + attributions schema from the existing
 plugin. ``extra="forbid"`` rejects unknown keys so writers discover
 typos at parse time.
 """
+
 from __future__ import annotations
 
 import datetime
