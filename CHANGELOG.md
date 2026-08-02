@@ -25,6 +25,18 @@
 - CLI subcommand: `migrate voices [--src] [--dst] [--overwrite]
   [--dry-run]` copies voice profiles from a legacy plugin-data location
   to the XDG root; renders a copied/skipped/errors summary.
+- CLI subcommands under the `voice` sub-typer:
+  `voice compose <name>` runs an interactive REPL walking a writer
+  through nine dimensions (purpose, audience, register, diction,
+  rhythm, syntax, lexicon, structure, never) and accepts/modifies/
+  declines/skips the voice-composer's `VoiceDelta` proposals;
+  `voice refine <name> [dim]` reuses the same REPL against an
+  existing profile; `voice draft <name> <brief> [--to <output>]`
+  dispatches the voice-stylist agent in `draft` mode (with a tmp
+  scratch file when no `--to` is given, stdout otherwise);
+  `voice edit <file> --voice <name> [--in-place]` dispatches the
+  voice-stylist agent in `edit` mode and optionally writes the
+  revised text back to the source file. All four honor `--voices-root`.
 
 ### Changed
 - Rewrite as pydantic-ai CLI + FastMCP server. Plugin reduced to thin adapter.
