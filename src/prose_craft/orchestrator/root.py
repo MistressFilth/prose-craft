@@ -10,12 +10,39 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 from pydantic_ai import Agent
 
+from prose_craft.agents.results import (
+    ArchitectResult,
+    DraftResult,
+    EditResult,
+    ProseDiagnostic,
+    SubstitutionPlan,
+    VoiceDelta,
+)
 from prose_craft.config import get_model, get_voices_root
+from prose_craft.orchestrator.deps import (
+    AnalysisDeps,
+    ArchitectDeps,
+    ComposerDeps,
+    EditorDeps,
+    StylistDeps,
+    TuneDeps,
+    VoiceDeps,
+)
+from prose_craft.voices.check import VoiceVerdict
 
 __all__ = ["ProseCraft"]
+
+# Generic over the factory's return type. Unconstrained (rather than
+# `bound=Agent`) because `Agent` is itself generic in `[DepsType,
+# OutputType]` and `Agent[AnalysisDeps, ProseDiagnostic]` is not a
+# subtype of the bare `Agent` class. The cache assignment and the
+# per-accessor return types are what keep callers honest; the type
+# ignores on the cache boundary document the upcast from `T` to `Agent`.
+T = TypeVar("T")
 
 # Per-line `# type: ignore[import-untyped]` comments on the seven
 # `from prose_craft.agents.<x> import build_<x>` statements below are
@@ -42,42 +69,42 @@ class ProseCraft:
         self.log_level = log_level
         self._agents: dict[str, Agent] = {}
 
-    def _lazy(self, key: str, factory: Callable[[], Agent]) -> Agent:
+    def _lazy(self, key: str, factory: Callable[[], T]) -> T:
         if key not in self._agents:
-            self._agents[key] = factory()
-        return self._agents[key]
+            self._agents[key] = factory()  # type: ignore[assignment]
+        return self._agents[key]  # type: ignore[return-value]
 
-    def analyst(self) -> Agent:
-        from prose_craft.agents.analyst import build_analyst  # type: ignore[import-untyped]
+    def analyst(self) -> Agent[AnalysisDeps, ProseDiagnostic]:
+        from prose_craft.agents.analyst import build_analyst
 
         return self._lazy("analyst", lambda: build_analyst(self.model))
 
-    def editor(self) -> Agent:
+    def editor(self) -> Agent[EditorDeps, EditResult]:
         from prose_craft.agents.editor import build_editor  # type: ignore[import-untyped]
 
         return self._lazy("editor", lambda: build_editor(self.model))
 
-    def architect(self) -> Agent:
+    def architect(self) -> Agent[ArchitectDeps, ArchitectResult]:
         from prose_craft.agents.architect import build_architect  # type: ignore[import-untyped]
 
         return self._lazy("architect", lambda: build_architect(self.model))
 
-    def tune_diction(self) -> Agent:
+    def tune_diction(self) -> Agent[TuneDeps, SubstitutionPlan]:
         from prose_craft.agents.tune_diction import build_tune_diction  # type: ignore[import-untyped]
 
         return self._lazy("tune_diction", lambda: build_tune_diction(self.model))
 
-    def voice_checker(self) -> Agent:
+    def voice_checker(self) -> Agent[VoiceDeps, VoiceVerdict]:
         from prose_craft.agents.voice_checker import build_voice_checker  # type: ignore[import-untyped]
 
         return self._lazy("voice_checker", lambda: build_voice_checker(self.model))
 
-    def voice_stylist(self) -> Agent:
+    def voice_stylist(self) -> Agent[StylistDeps, DraftResult]:
         from prose_craft.agents.voice_stylist import build_voice_stylist  # type: ignore[import-untyped]
 
         return self._lazy("voice_stylist", lambda: build_voice_stylist(self.model))
 
-    def voice_composer(self) -> Agent:
+    def voice_composer(self) -> Agent[ComposerDeps, list[VoiceDelta]]:
         from prose_craft.agents.voice_composer import build_voice_composer  # type: ignore[import-untyped]
 
         return self._lazy(
