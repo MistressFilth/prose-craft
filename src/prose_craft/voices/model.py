@@ -124,7 +124,7 @@ class Attribution(BaseModel):
 class VoiceProfile(BaseModel):
     """D1-D10 + audiences + attributions."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     voice: str
     version: int = 1

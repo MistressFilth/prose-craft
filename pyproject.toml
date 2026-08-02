@@ -41,6 +41,15 @@ packages = ["src/prose_craft"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-ra -q"
+filterwarnings = [
+    # VoiceProfile.register shadows BaseModel.register; this is an intentional
+    # field name choice (D3 of the voice profile schema) and the warning is
+    # emitted unconditionally by Pydantic v2 (see pydantic/_internal/_fields.py).
+    # The field never collides at runtime (register() on BaseModel is the
+    # deprecated abc virtual-subclass hook; VoiceProfile.register is a data
+    # field). Suppress the noise to keep test output pristine.
+    "ignore:Field name \"register\" in \".*\" shadows an attribute in parent \"BaseModel\":UserWarning",
+]
 
 [tool.ruff]
 line-length = 100
