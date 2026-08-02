@@ -90,7 +90,7 @@ class ProseCraft:
         return self._lazy("architect", lambda: build_architect(self.model))
 
     def tune_diction(self) -> Agent[TuneDeps, SubstitutionPlan]:
-        from prose_craft.agents.tune_diction import build_tune_diction  # type: ignore[import-untyped]
+        from prose_craft.agents.tune_diction import build_tune_diction
 
         return self._lazy("tune_diction", lambda: build_tune_diction(self.model))
 
