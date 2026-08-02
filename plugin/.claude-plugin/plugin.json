@@ -1,9 +1,12 @@
 {
-    "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-    "name": "prose-craft",
-    "version": "0.1.0",
-    "description": "A plugin for designing, using, and analyzing prose voice.",
-    "author": {
-        "name": "MistressFilth"
+  "name": "prose-craft",
+  "version": "0.1.0",
+  "description": "Thin Claude Code adapter over the prose-craft engine. The engine itself is a pydantic-ai CLI + FastMCP server in this same repo.",
+  "author": { "name": "MistressFilth" },
+  "mcpServers": {
+    "prose-craft": {
+      "command": "uv",
+      "args": ["run", "--project", ".", "prose-craft", "mcp"]
     }
+  }
 }
