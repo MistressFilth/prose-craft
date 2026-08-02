@@ -26,9 +26,7 @@ def test_migrate_voices_cli(tmp_path: Path) -> None:
     dst = tmp_path / "dst"
     _seed(src, "alpha")
     _seed(src, "beta")
-    result = runner.invoke(
-        app, ["migrate", "voices", "--src", str(src), "--dst", str(dst)]
-    )
+    result = runner.invoke(app, ["migrate", "voices", "--src", str(src), "--dst", str(dst)])
     assert result.exit_code == 0, result.stdout
     assert (dst / "alpha" / "voice.md").exists()
     assert (dst / "beta" / "voice.md").exists()

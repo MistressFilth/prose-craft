@@ -45,8 +45,6 @@ def voice_path(name: str, *, root: Path | None = None) -> Path:
     including path-traversal attempts, raise :class:`VoiceNameError`.
     """
     if _NAME_RE.fullmatch(name) is None:
-        raise VoiceNameError(
-            f"invalid voice name {name!r}: must match [a-z0-9][a-z0-9-]*"
-        )
+        raise VoiceNameError(f"invalid voice name {name!r}: must match [a-z0-9][a-z0-9-]*")
     base = (root or get_voices_root()) / name
     return base / "voice.md"

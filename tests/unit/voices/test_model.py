@@ -36,10 +36,12 @@ def test_minimal_profile_parses():
 
 def test_extra_keys_rejected():
     with pytest.raises(ValidationError):
-        VoiceProfile.model_validate({
-            "voice": "x",
-            "unknown_field": "y",
-        })
+        VoiceProfile.model_validate(
+            {
+                "voice": "x",
+                "unknown_field": "y",
+            }
+        )
 
 
 def test_audience_ceiling_defaults():

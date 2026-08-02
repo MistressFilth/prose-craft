@@ -30,7 +30,9 @@ def test_converged_set_scores_low_dispersion():
     profile = D.measure_set(CONVERGED_DRAFTS)
     assert profile["n"] == 3
     assert profile["altitude_1"]["dispersion_index"] == pytest.approx(0.189, abs=0.01)
-    assert profile["altitude_2"]["distinct_opener_frames_fraction"] == pytest.approx(0.333, abs=0.01)
+    assert profile["altitude_2"]["distinct_opener_frames_fraction"] == pytest.approx(
+        0.333, abs=0.01
+    )
     assert profile["altitude_2"]["mean_opener_similarity"] == pytest.approx(1.0, abs=0.01)
 
 

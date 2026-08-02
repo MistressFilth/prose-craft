@@ -23,17 +23,32 @@ def test_voice_draft_writes_file(monkeypatch, tmp_path):
     )
 
     def fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        return ModelResponse(parts=[TextPart(json.dumps({
-            "text": "Drafted text.",
-            "change_log": "ok",
-            "voice_check_report": None,
-        }))])
+        return ModelResponse(
+            parts=[
+                TextPart(
+                    json.dumps(
+                        {
+                            "text": "Drafted text.",
+                            "change_log": "ok",
+                            "voice_check_report": None,
+                        }
+                    )
+                )
+            ]
+        )
 
     out = tmp_path / "draft.md"
-    result = runner.invoke(app, [
-        "voice", "draft", "dnova", "write a memo",
-        "--to", str(out),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "voice",
+            "draft",
+            "dnova",
+            "write a memo",
+            "--to",
+            str(out),
+        ],
+    )
     # Will fail because the agent's model isn't stubbed. Verify CLI parses.
     # The actual agent output requires model wiring; this test only
     # confirms argument parsing and the existence of the subcommand.
