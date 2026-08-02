@@ -29,6 +29,7 @@ dev = [
 
 [project.scripts]
 prose = "prose_craft.cli:app"
+prose-craft = "prose_craft.cli:app"
 
 [build-system]
 requires = ["hatchling"]
