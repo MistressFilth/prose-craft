@@ -6,8 +6,12 @@ Subcommands:
 * ``config`` — print the active model and voices root.
 * ``voice list`` — enumerate every voice under the active root.
 * ``voice show`` — print a voice profile (markdown rendering or raw file).
+* ``analyze`` — run the analyst agent (or deterministic metrics only).
+* ``edit`` — run the editor agent; optionally write the result back to the file.
+* ``architect`` — run the architect agent; print a structural analysis.
+* ``tune-diction`` — run the tune-diction agent; print a substitution plan.
 
-Subsequent CLI tasks (29-32) will add ``voice check``, ``voice init``,
+Subsequent CLI tasks (30-32) will add ``voice check``, ``voice init``,
 ``migrate-voice``, and ``voice compose``/``voice refine``/``voice draft``/
 ``voice edit`` under the same ``voice`` sub-typer.
 """
@@ -15,6 +19,7 @@ Subsequent CLI tasks (29-32) will add ``voice check``, ``voice init``,
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Literal
 
 import typer
 from rich.console import Console
@@ -22,6 +27,7 @@ from rich.markdown import Markdown
 
 from prose_craft import __version__
 from prose_craft.config import get_model, get_voices_root
+from prose_craft.orchestrator.root import ProseCraft
 from prose_craft.voices.io import list_voices, read_voice_raw
 
 __all__ = ["app", "voice_app"]
@@ -102,3 +108,143 @@ def voice_show(
     typer.echo(f"audience: {profile.audience or '(unset)'}\n")
     if body.strip():
         console.print(Markdown(body))
+
+
+def _render_prose_diagnostic(diag: Any) -> str:
+    """Render a ProseDiagnostic as markdown for stdout."""
+    from prose_craft.analysis.metrics import ProseMetrics
+
+    if diag.metrics is None:
+        return "(empty draft)"
+    m: ProseMetrics = diag.metrics
+    lines = [
+        "# Prose Diagnostic",
+        "",
+        f"Words: {m.word_count}  Sentences: {m.sentence_count}",
+        "",
+        "**Rhythm**",
+        f"- Mean sentence length: {m.mean_sentence_length} words",
+        f"- Variation (std dev): {m.sentence_length_std} (target: 8-12)",
+        f"- Short (<10): {m.short_sentences_pct}%  Long (>25): {m.long_sentences_pct}%",
+        "",
+        "**Diction**",
+        f"- Germanic: {m.germanic_pct}%  Latinate: {m.latinate_pct}%",
+        f"- Avg syllables/word: {m.avg_syllables_per_word}  Polysyllabic: {m.polysyllabic_pct}%",
+        "",
+        "**Readability**",
+        f"- Flesch: {m.flesch_reading_ease}",
+        "",
+        "**Cohesion**",
+        f"- Connectives/100 words: {m.connectives_per_100_words} (target: 2-4)",
+        f"- Causal: {m.causal_markers}  Temporal: {m.temporal_markers}",
+    ]
+    if diag.voice_section:
+        lines.extend(["", diag.voice_section])
+    if diag.dispersion is not None:
+        lines.extend(["", f"# Dispersion (n={diag.dispersion.n})"])
+    if diag.clause_density is not None:
+        lines.extend(
+            [
+                "",
+                "# Clause density",
+                f"- ppc: {diag.clause_density.ppc_per_1k}/1k",
+                f"- agentless_passive: {diag.clause_density.agentless_passive_per_1k}/1k",
+            ]
+        )
+    if diag.issues:
+        lines.extend(["", "**Issues**"] + [f"- {i}" for i in diag.issues])
+    return "\n".join(lines)
+
+
+@app.command()
+def analyze(
+    file: Path = typer.Argument(..., exists=True),  # noqa: B008
+    voice: str | None = typer.Option(None, "--voice"),
+    tolerance: Literal["strict", "normal", "relaxed"] = typer.Option("normal", "--tolerance"),
+    metrics_only: bool = typer.Option(False, "--metrics-only"),
+) -> None:
+    """Run the analyst agent (or deterministic metrics only)."""
+    from prose_craft.agents.results import ProseDiagnostic
+    from prose_craft.analysis.metrics import analyze_prose
+    from prose_craft.orchestrator.deps import AnalysisDeps
+
+    if metrics_only:
+        text = file.read_text(encoding="utf-8")
+        m = analyze_prose(text)
+        diag = ProseDiagnostic.model_validate({"metrics": m, "issues": []})
+        typer.echo(_render_prose_diagnostic(diag))
+        return
+    craft = ProseCraft()
+    result = craft.analyst().run_sync(
+        "Analyze this prose.",
+        deps=AnalysisDeps(
+            file_path=file,
+            voice_name=voice,
+            tolerance=tolerance,
+        ),
+    )
+    typer.echo(_render_prose_diagnostic(result.output))
+
+
+@app.command()
+def edit(
+    file: Path = typer.Argument(..., exists=True),  # noqa: B008
+    voice: str | None = typer.Option(None, "--voice"),
+    tolerance: Literal["strict", "normal", "relaxed"] = typer.Option("normal", "--tolerance"),
+    in_place: bool = typer.Option(
+        False, "--in-place", help="Write the edited text back to the file."
+    ),
+) -> None:
+    """Run the editor agent; print the change_log and the new text."""
+    from prose_craft.orchestrator.deps import EditorDeps
+
+    craft = ProseCraft()
+    result = craft.editor().run_sync(
+        "Edit this prose.",
+        deps=EditorDeps(
+            file_path=file,
+            voice_name=voice,
+            tolerance=tolerance,
+        ),
+    )
+    if in_place and result.output.changes:
+        text = file.read_text(encoding="utf-8")
+        for change in reversed(result.output.changes):
+            text = text.replace(change.before, change.after, 1)
+        file.write_text(text, encoding="utf-8")
+    typer.echo(result.output.change_log or "(no change log)")
+
+
+@app.command()
+def architect(
+    file: Path = typer.Argument(..., exists=True),  # noqa: B008
+    voice: str | None = typer.Option(None, "--voice"),
+) -> None:
+    """Run the architect agent; print the reconstruction proposal."""
+    from prose_craft.orchestrator.deps import ArchitectDeps
+
+    craft = ProseCraft()
+    result = craft.architect().run_sync(
+        "Architect this prose.",
+        deps=ArchitectDeps(file_path=file, voice_name=voice),
+    )
+    typer.echo(f"## Analysis\n\n{result.output.analysis}\n")
+    typer.echo(f"## Diagnosis\n\n{result.output.diagnosis}\n")
+    typer.echo(f"## Reconstruction\n\n{result.output.reconstruction_proposal}\n")
+
+
+@app.command("tune-diction")
+def tune_dict(
+    file: Path = typer.Argument(..., exists=True),  # noqa: B008
+    voice: str | None = typer.Option(None, "--voice"),
+) -> None:
+    """Run the tune-diction agent; print the substitution plan."""
+    from prose_craft.orchestrator.deps import TuneDeps
+
+    craft = ProseCraft()
+    result = craft.tune_diction().run_sync(
+        "Tune diction.",
+        deps=TuneDeps(file_path=file, voice_name=voice),
+    )
+    for s in result.output.suggestions:
+        typer.echo(f"{s.instead_of} -> {s.use}  ({s.note})")
