@@ -105,7 +105,7 @@ class ProseCraft:
         return self._lazy("voice_stylist", lambda: build_voice_stylist(self.model))
 
     def voice_composer(self) -> Agent[ComposerDeps, list[VoiceDelta]]:
-        from prose_craft.agents.voice_composer import build_voice_composer  # type: ignore[import-untyped]
+        from prose_craft.agents.voice_composer import build_voice_composer
 
         return self._lazy(
             "voice_composer",
