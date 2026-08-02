@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -30,28 +31,34 @@ VALID_BUMPS = ("major", "minor", "patch", "none")
 # non-zero-leading digits. Rejects "01.2.3", "1.2.3.4", "v1.2.3", etc.
 _SEMVER_RE = re.compile(r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$")
 _PYPROJECT_VERSION_RE = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
-_RUNTIME_VERSION_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"', re.MULTILINE)
 _PYPROJECT_VERSION_LINE_RE = re.compile(r'^version\s*=\s*"[^"]+"', flags=re.MULTILINE)
 _RUNTIME_VERSION_LINE_RE = re.compile(r'^__version__\s*=\s*"[^"]+"', flags=re.MULTILINE)
+
+# Format spec for git log that emits the full commit block (subject +
+# blank line + body) so BREAKING CHANGE footers reach classify_bump.
+_GIT_LOG_PRETTY = "%B%x00"
 
 
 def classify_bump(messages: Sequence[str]) -> str:
     """Return the highest-impact SemVer bump implied by ``messages``.
 
-    - ``major`` if any commit header carries ``!`` or any line of any
-      message body begins with ``BREAKING CHANGE:``.
-    - ``minor`` if any commit starts with ``feat``.
-    - ``patch`` if any commit starts with ``fix``.
-    - ``none`` otherwise.
+    Each entry in ``messages`` may be either a single-line subject or a
+    full commit block (``subject\\n\\nbody``). The function:
+
+    - returns ``major`` if any commit header carries ``!`` or any line of
+      any message begins with ``BREAKING CHANGE:``;
+    - returns ``minor`` when any commit starts with ``feat``;
+    - returns ``patch`` when any commit starts with ``fix``;
+    - returns ``none`` otherwise.
     """
     has_feat = False
     has_fix = False
     for raw in messages:
         if not raw:
             continue
-        header = raw.splitlines()[0]
         if re.search(r"^BREAKING CHANGE:", raw, re.MULTILINE):
             return "major"
+        header = raw.splitlines()[0]
         type_token = header.split(":", 1)[0]
         if "!" in type_token:
             return "major"
@@ -141,18 +148,26 @@ def _latest_tag() -> str | None:
 
 
 def _commits_since(tag: str | None) -> list[str]:
+    """Return commit blocks (``subject\\n\\nbody``) since ``tag``.
+
+    Each entry is one commit's full message text so that BREAKING CHANGE
+    footers reach ``classify_bump``. ``%x00`` (NUL) is appended to
+    preserve trailing newlines that ``%B`` would otherwise strip; we
+    strip the sentinel before returning.
+    """
     rng = f"{tag}..HEAD" if tag else "HEAD"
     result = subprocess.run(
-        ["git", "log", "--pretty=%s", rng],
+        ["git", "log", f"--pretty={_GIT_LOG_PRETTY}", rng],
         check=True,
         text=True,
         capture_output=True,
         cwd=REPO_ROOT,
     )
-    return [line for line in result.stdout.splitlines() if line]
+    return [block for block in result.stdout.split("\x00") if block.strip()]
 
 
-def _tag_exists(tag: str) -> bool:
+def _tag_exists_locally(tag: str) -> bool:
+    """Return True if ``tag`` resolves to a local ref."""
     result = subprocess.run(
         ["git", "rev-parse", "--verify", "--quiet", tag],
         check=False,
@@ -203,20 +218,15 @@ def _update_changelog_text(text: str, version: str, date: str, subjects: Sequenc
     return text.rstrip() + "\n\n" + new_section
 
 
-def _today() -> str:
-    return subprocess.run(
-        ["date", "+%Y-%m-%d"],
-        check=True,
-        text=True,
-        capture_output=True,
-        cwd=REPO_ROOT,
-    ).stdout.strip()
+def _today_utc() -> str:
+    """Return today's UTC date as ``YYYY-MM-DD`` (portable, no POSIX `date`)."""
+    return datetime.now(timezone.utc).date().isoformat()
 
 
 def _metadata_surfaces(
     version: str, subjects: Sequence[str]
 ) -> list[tuple[str, Path, Callable[[str], str]]]:
-    today = _today()
+    today = _today_utc()
     return [
         ("pyproject.toml", PYPROJECT, lambda text: _set_pyproject_version_text(text, version)),
         (
@@ -270,22 +280,34 @@ def _apply_transaction(
         for path, new_text in pending:
             _atomic_write(path, new_text)
     except Exception:
-        for path, original in snapshots.items():
-            try:
-                _atomic_write(path, original)
-            except Exception:
-                pass
+        _rollback(snapshots)
         raise
     return snapshots
 
 
 def _rollback(snapshots: dict[Path, str]) -> None:
-    """Restore every path in ``snapshots`` to its pre-write content."""
+    """Restore every path in ``snapshots`` to its pre-write content.
+
+    Any per-file restore failure is logged to stderr but does not abort
+    the rollback — best-effort cleanup, then the original failure is
+    re-raised by the caller.
+    """
     for path, original in snapshots.items():
         try:
             _atomic_write(path, original)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(
+                f"release rollback: failed to restore {path}: {exc}",
+                file=sys.stderr,
+            )
+
+
+def _delete_tag(tag: str) -> None:
+    """Best-effort local tag deletion; logs but does not raise on failure."""
+    try:
+        _run(["git", "tag", "-d", tag])
+    except RuntimeError as exc:
+        print(f"release cleanup: failed to delete local tag {tag!r}: {exc}", file=sys.stderr)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -293,6 +315,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.parse_args(list(argv) if argv is not None else None)
 
     snapshots: dict[Path, str] = {}
+    tag_created = False
+    tag_name = ""
     try:
         _check_clean_worktree()
         current = _read_root_version()
@@ -311,8 +335,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         version = next_version(current, bump)
         tag_name = f"v{version}"
-        if _tag_exists(tag_name):
-            raise RuntimeError(f"target tag {tag_name!r} already exists locally or remotely")
+        if _tag_exists_locally(tag_name):
+            raise RuntimeError(f"target tag {tag_name!r} already exists locally")
         print(f"release: {current} -> {version} (bump={bump})")
 
         snapshots = _apply_transaction(_metadata_surfaces(version, subjects))
@@ -325,13 +349,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             _run(["make", "test"])
         except RuntimeError:
             _rollback(snapshots)
+            snapshots = {}
             raise
 
-        _run(["git", "tag", tag_name])
         try:
+            _run(["git", "tag", tag_name])
+            tag_created = True
             _run(["git", "push", "origin", tag_name])
-        except Exception:
-            _run(["git", "tag", "-d", tag_name])
+        except RuntimeError:
+            if tag_created:
+                _delete_tag(tag_name)
+                tag_created = False
+            _rollback(snapshots)
+            snapshots = {}
             raise
     except RuntimeError as exc:
         print(f"release aborted: {exc}", file=sys.stderr)
