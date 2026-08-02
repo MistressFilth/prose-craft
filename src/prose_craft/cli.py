@@ -10,10 +10,14 @@ Subcommands:
 * ``edit`` — run the editor agent; optionally write the result back to the file.
 * ``architect`` — run the architect agent; print a structural analysis.
 * ``tune-diction`` — run the tune-diction agent; print a substitution plan.
+* ``voice check`` — run the deterministic voice check (mechanical,
+  statistical, judgments-needed) and render markdown or ``--json``.
+* ``voice init`` — scaffold a blank voice.md from the template.
+* ``migrate voices`` — copy voice profiles from a legacy location to the
+  XDG root.
 
-Subsequent CLI tasks (30-32) will add ``voice check``, ``voice init``,
-``migrate-voice``, and ``voice compose``/``voice refine``/``voice draft``/
-``voice edit`` under the same ``voice`` sub-typer.
+Subsequent CLI tasks (32) will add ``voice compose``/``voice refine``/
+``voice draft``/``voice edit`` under the same ``voice`` sub-typer.
 """
 
 from __future__ import annotations
@@ -331,3 +335,30 @@ def voice_init(
     prose_body = body.split("---\n", 2)[2] if body.count("---") >= 2 else "\n"
     write_voice(profile, prose_body, root=root)
     typer.echo(f"initialized {path}")
+
+
+migrate_app = typer.Typer(help="Migration helpers.")
+app.add_typer(migrate_app, name="migrate")
+
+
+@migrate_app.command("voices")
+def migrate_voices_cmd(
+    src: Path | None = typer.Option(None, "--src"),
+    dst: Path | None = typer.Option(None, "--dst"),
+    overwrite: bool = typer.Option(False, "--overwrite"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """Copy voice profiles from a legacy location to the XDG root."""
+    from prose_craft.voices.migrate import migrate_voices
+
+    report = migrate_voices(
+        src=src,
+        dst=_voices_root_opt(dst),
+        overwrite=overwrite,
+        dry_run=dry_run,
+    )
+    typer.echo(f"copied: {', '.join(report.copied) or '(none)'}")
+    typer.echo(f"skipped: {', '.join(report.skipped) or '(none)'}")
+    if report.errors:
+        typer.echo(f"errors: {'; '.join(report.errors)}", err=True)
+        raise typer.Exit(code=1)

@@ -22,6 +22,9 @@
   judgments-needed) and renders markdown or `--json`; `voice init <name>`
   scaffolds a blank `voice.md` from the bundled template. Both honor
   `--voices-root`.
+- CLI subcommand: `migrate voices [--src] [--dst] [--overwrite]
+  [--dry-run]` copies voice profiles from a legacy plugin-data location
+  to the XDG root; renders a copied/skipped/errors summary.
 
 ### Changed
 - Rewrite as pydantic-ai CLI + FastMCP server. Plugin reduced to thin adapter.
