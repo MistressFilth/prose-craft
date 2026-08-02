@@ -66,10 +66,9 @@ pure Python, callable from CLI, agents (as tools), and MCP. Voice
 profiles are Pydantic models that round-trip the existing `voice.md`
 front-matter format.
 
-See `docs/superpowers/specs/2026-08-01-prose-craft-pydantic-ai-design.md`
-for the full design and
-`docs/superpowers/plans/2026-08-01-prose-craft-pydantic-ai-rewrite.md`
-for the implementation plan.
+The design and implementation plan live in the project's
+notes directory (`@AGENTS.local.md`); see the spec and plan under
+`superpowers/` there.
 
 ## Development
 
