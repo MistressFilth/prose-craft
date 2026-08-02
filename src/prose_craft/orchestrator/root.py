@@ -95,7 +95,7 @@ class ProseCraft:
         return self._lazy("tune_diction", lambda: build_tune_diction(self.model))
 
     def voice_checker(self) -> Agent[VoiceDeps, VoiceVerdict]:
-        from prose_craft.agents.voice_checker import build_voice_checker  # type: ignore[import-untyped]
+        from prose_craft.agents.voice_checker import build_voice_checker
 
         return self._lazy("voice_checker", lambda: build_voice_checker(self.model))
 
