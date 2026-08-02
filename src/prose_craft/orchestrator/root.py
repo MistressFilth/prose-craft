@@ -85,7 +85,7 @@ class ProseCraft:
         return self._lazy("editor", lambda: build_editor(self.model))
 
     def architect(self) -> Agent[ArchitectDeps, ArchitectResult]:
-        from prose_craft.agents.architect import build_architect  # type: ignore[import-untyped]
+        from prose_craft.agents.architect import build_architect
 
         return self._lazy("architect", lambda: build_architect(self.model))
 
