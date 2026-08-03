@@ -348,8 +348,18 @@ def _today_utc() -> str:
 def _metadata_surfaces(
     version: str, subjects: Sequence[str]
 ) -> list[tuple[str, Path, Callable[[str], str]]]:
+    """Build transactional release mutations for both version contracts.
+
+    Engine/runtime/plugin follow the release bump. Marketplace development
+    metadata advances one patch for every repository release, independently
+    of the engine's bump level.
+    """
     today = _today_utc()
     marketplace_version = next_version(_read_json_version(MARKETPLACE_JSON), "patch")
+    changelog_subjects = (
+        *subjects,
+        f"build(marketplace): advance development metadata to {marketplace_version}",
+    )
     return [
         ("pyproject.toml", PYPROJECT, lambda text: _set_pyproject_version_text(text, version)),
         (
@@ -370,7 +380,7 @@ def _metadata_surfaces(
         (
             "CHANGELOG.md",
             CHANGELOG,
-            lambda text: _update_changelog_text(text, version, today, subjects),
+            lambda text: _update_changelog_text(text, version, today, changelog_subjects),
         ),
     ]
 

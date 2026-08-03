@@ -11,7 +11,8 @@
 
 ### Fixed
 - Restored direct-fetch bare-repository configuration and removed stale remote-tracking refs.
-- Removed prohibited co-author trailers from repository history and restored the formatting CI gate.
+- Repository history no longer contains prohibited co-author trailers after the staged `git filter-repo` rewrite.
+- Restored the formatting CI gate for voice-check feature tests.
 - Release helper no longer leaks `Co-authored-by:` footers, `---------` squash-merge separators, or `BREAKING CHANGE:` footers into changelog bullets.
 - Release helper classifies `fix:` commits under `### Fixed` instead of `### Changed`.
 
