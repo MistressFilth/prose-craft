@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Pre-PR checklist to `AGENTS.md`.
+- Release helper groups bullets by Conventional Commit type into `### Added` / `### Fixed` / `### Changed`.
+
+### Fixed
+- Release helper no longer leaks `Co-authored-by:` footers, `---------` squash-merge separators, or `BREAKING CHANGE:` footers into changelog bullets.
+- Release helper classifies `fix:` commits under `### Fixed` instead of `### Changed`.
+
+## [0.2.2] - 2026-08-03
+
+### Fixed
+- lstrip commit blocks to recover subject on first line.
+- Close mkstemp fd on failure to prevent leak.
+- Drop unsupported capture kwarg from `_run` calls.
+
+## [0.2.1] - 2026-08-03
+
+### Fixed
+- Drop vestigial plugin pyproject from metadata surfaces.
+
 ## [0.2.0] - 2026-08-03
 
 ### Changed
@@ -18,33 +40,3 @@
 ## [0.0.0] - 2026-07-14
 
 Initial release as a Claude Code plugin only.
-
-## [0.2.1] - 2026-08-03
-
-### Changed
-- fix(release): drop vestigial plugin pyproject from metadata surfaces
-
-## [0.2.2] - 2026-08-03
-
-### Changed
-- fix(release): drop unsupported capture kwarg from _run calls
-
-- fix(release): lstrip commit blocks to recover subject on first line
-
-- chore: align uv.lock with pyproject version
-
-- fix(release): close mkstemp fd on failure to prevent leak
-
-- fix(release): auto-commit metadata before tagging (#11)
-
-Co-authored-by: v0idbit <>
-- chore(release): 0.2.1 via guarded release helper (#10)
-
-* fix(release): drop vestigial plugin pyproject from metadata surfaces
-
-* chore(release): 0.2.1 via guarded release helper
-
----------
-
-Co-authored-by: v0idbit <>
-

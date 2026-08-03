@@ -205,9 +205,122 @@ def _set_json_version_text(text: str, version: str) -> str:
     return json.dumps(data, indent=2) + "\n"
 
 
+def _strip_footer(block: str) -> str:
+    """Strip ``Co-authored-by`` and ``BREAKING CHANGE:`` footers from a commit block.
+
+    Git's commit body treats the first paragraph as the description and
+    any subsequent paragraph as a footer block. ``Co-authored-by`` and
+    ``BREAKING CHANGE:`` are the only Conventional Commit footers the
+    release helper cares about; everything below the description should
+    not appear in a changelog bullet.
+
+    Returns the message with the trailing newline trimmed.
+    """
+    lines = block.splitlines()
+    if not lines:
+        return ""
+    # First line is always the subject.
+    subject = lines[0]
+    # Walk forward until the first blank line; everything from that blank
+    # line onwards is the body. Footers (Co-authored-by / BREAKING CHANGE)
+    # can sit at the end of the body; everything after the *last* blank
+    # line that is followed by a footer line is footer, and we drop it.
+    # In practice, the simplest correct rule: drop any trailing line that
+    # starts with a known footer marker.
+    body_lines: list[str] = []
+    for line in lines[1:]:
+        if line.startswith("Co-authored-by:") or line.startswith("Co-Authored-By:"):
+            continue
+        if line.startswith("BREAKING CHANGE:"):
+            continue
+        if line == "---------":
+            # Squash-merge separator left over from a GitHub PR body.
+            continue
+        body_lines.append(line)
+    # Strip leading and trailing blank lines from the body.
+    while body_lines and not body_lines[0].strip():
+        body_lines.pop(0)
+    while body_lines and not body_lines[-1].strip():
+        body_lines.pop()
+    if not body_lines:
+        return subject
+    return subject + "\n\n" + "\n".join(body_lines)
+
+
+def _first_line(message: str) -> str:
+    """Return the first non-empty line of a (possibly multi-paragraph) message."""
+    for line in message.splitlines():
+        if line.strip():
+            return line.strip()
+    return ""
+
+
+def _classify_commit(subject: str) -> str:
+    """Map a Conventional Commit subject to a Keep-a-Changelog group.
+
+    Returns ``"Added"`` for ``feat``-typed subjects, ``"Fixed"`` for
+    ``fix``-typed subjects, and ``"Changed"`` for everything else.
+    """
+    if not subject:
+        return "Changed"
+    type_token = subject.split(":", 1)[0]
+    if type_token.startswith("feat"):
+        return "Added"
+    if type_token.startswith("fix"):
+        return "Fixed"
+    return "Changed"
+
+
+# Commits that the release helper itself produced (``chore(release):
+# <version> via guarded release helper``) are excluded from the changelog
+# bullets because they describe the helper's own output, not a user-facing
+# change.
+_RELEASE_COMMIT_PREFIX = "chore(release):"
+
+
+def _group_bullets(blocks: Sequence[str]) -> dict[str, list[str]]:
+    """Group commit subjects into ``Added``/``Fixed``/``Changed`` buckets.
+
+    Each block is the full commit message as returned by
+    ``git log --pretty=%B``; the helper strips footers, takes the first
+    line as the subject, classifies by Conventional Commit type, and
+    returns a dict with keys ``"Added"``, ``"Fixed"``, ``"Changed"``.
+    Values are pre-formatted bullet strings (``- subject``).
+    """
+    groups: dict[str, list[str]] = {"Added": [], "Fixed": [], "Changed": []}
+    for block in blocks:
+        message = _strip_footer(block)
+        subject = _first_line(message)
+        if not subject:
+            continue
+        if subject.startswith(_RELEASE_COMMIT_PREFIX):
+            continue
+        groups[_classify_commit(subject)].append(f"- {subject}")
+    return groups
+
+
 def _render_changelog_section(version: str, date: str, bodies: Sequence[str]) -> str:
-    bullets = "\n".join(f"- {body}" for body in bodies) if bodies else "- No notable changes."
-    return f"## [{version}] - {date}\n\n### Changed\n{bullets}\n\n"
+    """Render a release section from raw commit blocks.
+
+    Subjects are grouped by Conventional Commit type into ``### Added``
+    (feat), ``### Fixed`` (fix), and ``### Changed`` (everything else)
+    subsections. Empty groups are omitted from the output. When every
+    bucket is empty, a single ``### Changed`` subsection with a
+    ``- No notable changes.`` bullet is rendered so the section is
+    never empty.
+    """
+    groups = _group_bullets(bodies)
+    has_any = any(groups[k] for k in ("Added", "Fixed", "Changed"))
+    if not has_any:
+        return f"## [{version}] - {date}\n\n### Changed\n- No notable changes.\n\n"
+    parts: list[str] = [f"## [{version}] - {date}", ""]
+    for heading in ("Added", "Fixed", "Changed"):
+        if not groups[heading]:
+            continue
+        parts.append(f"### {heading}")
+        parts.extend(groups[heading])
+        parts.append("")
+    return "\n".join(parts)
 
 
 def _update_changelog_text(text: str, version: str, date: str, subjects: Sequence[str]) -> str:
