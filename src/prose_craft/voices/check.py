@@ -119,30 +119,33 @@ def _check_preferred(text: str, profile: VoiceProfile) -> list[Violation]:
     return out
 
 
-def _check_pet_phrases(text: str, profile: VoiceProfile, tolerance: str) -> list[Violation]:
+def _check_pet_phrases(text: str, profile: VoiceProfile, band: float) -> list[Violation]:
     """Pet phrases recur by design. Flag over-saturation only.
 
-    Band: more than 3x per 1000 words is over-saturated, scaled by
-    tolerance (strict = 2x, normal = 3x, relaxed = 5x).
+    ``band`` is the effective tolerance band (looser → higher density
+    allowed). At the default tolerance of ``normal`` and no audience,
+    ``band`` is 1.0 — that maps to the legacy "3 per 1k words" cap.
+    A doubled band (2.0) doubles the cap; a halved band (0.5) halves it.
     """
     out: list[Violation] = []
     words = tokenize_words(text)
     if not words or not profile.lexicon.pet_phrases:
         return out
     text_lower = text.lower()
-    band = {"strict": 2, "normal": 3, "relaxed": 5}[tolerance]
+    # 3 per 1k words is the "normal" cap; scale linearly with the band.
+    density_cap = 3.0 * band
     for phrase in profile.lexicon.pet_phrases:
         count = text_lower.count(phrase.lower())
         density = count / len(words) * 1000
-        if density > band:
+        if density > density_cap:
             out.append(
                 Violation(
                     rule="lexicon.pet_phrases",
                     message=f"pet phrase {phrase!r} appears {count} times ({density:.1f}/1k)",
                     category="statistical",
                     measured=round(density, 1),
-                    target=f"<= {band}/1k",
-                    band=tolerance,
+                    target=f"<= {density_cap:.1f}/1k",
+                    band=f"±{band}",
                 )
             )
     return out
@@ -281,7 +284,7 @@ def check_voice(
     if audience is not None:
         mechanical += _check_audience_never(text, audience)
         mechanical += _check_surface_filter(text, audience, surface)
-    statistical = _check_pet_phrases(text, profile, tolerance) + _check_sentence_length(
+    statistical = _check_pet_phrases(text, profile, band) + _check_sentence_length(
         text, profile, band
     )
     seen: set[str] = set()
