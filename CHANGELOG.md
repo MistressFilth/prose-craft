@@ -1,27 +1,18 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0] - 2026-08-03
 
 ### Added
-- Pre-PR checklist to `AGENTS.md`.
-- Release helper groups bullets by Conventional Commit type into `### Added` / `### Fixed` / `### Changed`.
 - `voice check` accepts `--audience`, `--severity`, `--dial`, and `--surface` flags; the resolved `ResolvedAudience` is fed into `check_voice()` and echoed in the verdict.
+- `voice check` (and the FastMCP `voice_check` tool) now mirror the audience knobs to a target surface: `--surface memo` resolves a `surface_filter.close: [memo]` audience into a violation.
+- `VoiceVerdict` gains an `audience` echo field plus a `violations` property that combines mechanical and statistical findings.
+- `VoiceProfile` carries the audience block as a first-class `AudiencesBlock` model with `private` / `team` / `external` slots, a `rationale` string, and an `entries()` accessor; shipped voices parse against the new schema.
+- Voice IO accepts an optional ``voices_root`` parameter throughout the agent factory chain — ``ProseCraft(voices_root=...)``, ``build_voice_stylist(voices_root=...)``, ``bind_voice_tools(voices_root=...)`` — so a CLI ``--voices-root`` override reaches the agent's read-side tools.
 
 ### Changed
 - Voice profiles' `audiences:` block is now honored by `voice draft`, `voice edit`, `voice check`, and the FastMCP server. New flags `--audience`, `--severity`, `--dial`, `--surface` apply on top of any front-matter `audience:` / `severity_ceiling:` / `dial_ceiling:` / `surface:` keys in the target file (precedence: CLI > front-matter > voice default). Default audience is the voice's most-permissive one. Closed audiences warn but allow. Severity and dial flags replace audience ceilings verbatim (caller responsibility). `voice check` tightens rule evaluation against the resolved audience's severity ceiling and merged `never_extend` list. `voice init` template now scaffolds an `audiences:` block.
-- `check_voice()` accepts a `ResolvedAudience` and a `surface` string; the audience's severity ceiling tightens the statistical tolerance band, mechanical entries in `audience.never` are enforced, and a surface that lands in `audience.surface_filter.close` is flagged as a violation. `VoiceVerdict` gains an `audience` echo field plus a `violations` property that combines mechanical and statistical findings.
-
-### Removed
-- `tests/unit/test_repository_metadata.py`; repository-metadata regression coverage is external to this project.
-- Release helper's automatic marketplace patch-bump and changelog-entry injection; marketplace version returns to a hand-edited surface that follows engine releases.
-- `.claude-plugin/marketplace.json` version rolled back from `0.2.3` to `0.2.2` after the auto-bump machinery was removed.
-
-### Fixed
-- Restored direct-fetch bare-repository configuration and removed stale remote-tracking refs.
-- Repository history no longer contains prohibited co-author trailers after the staged `git filter-repo` rewrite.
-- Restored the formatting CI gate for voice-check feature tests.
-- Release helper no longer leaks `Co-authored-by:` footers, `---------` squash-merge separators, or `BREAKING CHANGE:` footers into changelog bullets.
-- Release helper classifies `fix:` commits under `### Fixed` instead of `### Changed`.
+- `check_voice()` accepts a `ResolvedAudience` and a `surface` string; the audience's severity ceiling tightens the statistical tolerance band, mechanical entries in `audience.never` are enforced, and a surface that lands in `audience.surface_filter.close` is flagged as a violation. The audience ceiling also tightens the pet-phrase density cap, so a "team" or "external" audience surfaces over-saturation earlier than a "private" audience at the same tolerance.
+- `Violation.band` is now uniformly a `±N` band size (e.g. `"±0.6"`) for both `_check_pet_phrases` and `_check_sentence_length`. Older callers that read the tolerance name (e.g. `"normal"`) should switch to the new numeric form; the band is now the same shape as the audience-aware severity scale.
 
 ## [0.2.2] - 2026-08-03
 
