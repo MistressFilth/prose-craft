@@ -254,3 +254,36 @@ def test_resolve_cli_surface_overrides_front_matter(tmp_path):
     )
     assert result is not None
     assert result.surface_target == "memo"
+
+
+def test_resolve_closed_audience_emits_warning(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(
+        external=AudienceCeiling(closed=True, reason="internal only"),
+    )
+    _write_voice(root, "test", audiences)
+    result = resolve_audience("test", cli_audience="external", voices_root=root)
+    assert result is not None
+    assert result.closed is True
+    assert result.reason == "internal only"
+    assert any("closed" in w for w in result.warnings)
+
+
+def test_resolve_severity_out_of_range_raises(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling())
+    _write_voice(root, "test", audiences)
+    with pytest.raises(ValueError, match="severity"):
+        resolve_audience("test", cli_severity=6, voices_root=root)
+    with pytest.raises(ValueError, match="severity"):
+        resolve_audience("test", cli_severity=-1, voices_root=root)
+
+
+def test_resolve_dial_out_of_range_raises(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling())
+    _write_voice(root, "test", audiences)
+    with pytest.raises(ValueError, match="dial"):
+        resolve_audience("test", cli_dial=1.5, voices_root=root)
+    with pytest.raises(ValueError, match="dial"):
+        resolve_audience("test", cli_dial=-0.1, voices_root=root)

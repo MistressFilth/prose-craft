@@ -157,6 +157,15 @@ def resolve_audience(
     surface = cli_surface if cli_surface is not None else fm_surface
 
     # Never merge happens in Task 5; surface_filter.copy and closed/reason in Task 4.
+    if not 0 <= severity <= 5:
+        raise ValueError(f"severity {severity} out of range [0, 5]")
+    if not 0.0 <= dial <= 1.0:
+        raise ValueError(f"dial {dial} out of range [0.0, 1.0]")
+
+    if ceiling.closed:
+        warnings.append(
+            f"audience {name!r} is closed for voice {voice_name!r}: {ceiling.reason or '(no reason given)'}"
+        )
 
     return ResolvedAudience(
         name=name,
