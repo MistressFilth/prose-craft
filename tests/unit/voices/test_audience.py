@@ -137,3 +137,101 @@ def test_resolve_unknown_cli_audience_raises(tmp_path):
         resolve_audience("test", cli_audience="missing", voices_root=root)
     assert ei.value.audience == "missing"
     assert "private" in ei.value.available
+
+
+def test_resolve_front_matter_audience_overrides_default(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(
+        private=AudienceCeiling(severity_ceiling=5),
+        team=AudienceCeiling(severity_ceiling=3),
+    )
+    _write_voice(root, "test", audiences)
+    brief = tmp_path / "brief.md"
+    brief.write_text("---\naudience: team\n---\nbody\n", encoding="utf-8")
+    result = resolve_audience("test", front_matter_path=brief, voices_root=root)
+    assert result is not None
+    assert result.name == "team"
+    assert result.source == "frontmatter"
+
+
+def test_resolve_cli_overrides_front_matter(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(
+        private=AudienceCeiling(),
+        team=AudienceCeiling(),
+        external=AudienceCeiling(),
+    )
+    _write_voice(root, "test", audiences)
+    brief = tmp_path / "brief.md"
+    brief.write_text("---\naudience: team\n---\nbody\n", encoding="utf-8")
+    result = resolve_audience(
+        "test",
+        cli_audience="external",
+        front_matter_path=brief,
+        voices_root=root,
+    )
+    assert result is not None
+    assert result.name == "external"
+    assert result.source == "cli"
+
+
+def test_resolve_front_matter_severity_and_dial(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=4, dial_ceiling=0.8))
+    _write_voice(root, "test", audiences)
+    brief = tmp_path / "brief.md"
+    brief.write_text("---\nseverity_ceiling: 2\ndial_ceiling: 0.5\n---\n", encoding="utf-8")
+    result = resolve_audience("test", front_matter_path=brief, voices_root=root)
+    assert result is not None
+    assert result.severity_ceiling == 2
+    assert result.dial_ceiling == 0.5
+
+
+def test_resolve_front_matter_invalid_type_raises(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=3))
+    _write_voice(root, "test", audiences)
+    brief = tmp_path / "brief.md"
+    brief.write_text("---\nseverity_ceiling: high\n---\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="severity_ceiling"):
+        resolve_audience("test", front_matter_path=brief, voices_root=root)
+
+
+def test_resolve_front_matter_parse_error_falls_through(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=3))
+    _write_voice(root, "test", audiences)
+    brief = tmp_path / "brief.md"
+    # Broken YAML — falls through to voice default.
+    brief.write_text("---\n: :\n---\n", encoding="utf-8")
+    result = resolve_audience("test", front_matter_path=brief, voices_root=root)
+    assert result is not None
+    assert result.source == "voice_default"
+    assert any("front-matter" in w for w in result.warnings)
+
+
+def test_resolve_surface_from_front_matter(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=3))
+    _write_voice(root, "test", audiences)
+    brief = tmp_path / "brief.md"
+    brief.write_text("---\nsurface: rfc\n---\n", encoding="utf-8")
+    result = resolve_audience("test", front_matter_path=brief, voices_root=root)
+    assert result is not None
+    assert result.surface_target == "rfc"
+
+
+def test_resolve_cli_surface_overrides_front_matter(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=3))
+    _write_voice(root, "test", audiences)
+    brief = tmp_path / "brief.md"
+    brief.write_text("---\nsurface: rfc\n---\n", encoding="utf-8")
+    result = resolve_audience(
+        "test",
+        cli_surface="memo",
+        front_matter_path=brief,
+        voices_root=root,
+    )
+    assert result is not None
+    assert result.surface_target == "memo"

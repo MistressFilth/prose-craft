@@ -12,7 +12,7 @@ context.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -98,11 +98,39 @@ def resolve_audience(
     profile = read_voice(voice_name, root=voices_root)
     entries = profile.audiences.entries()
 
-    # Front-matter parsing is added in Task 3; for now skip it.
     fm_audience = None
     fm_severity = None
     fm_dial = None
     fm_surface = None
+    warnings: list[str] = []
+    if front_matter_path is not None and front_matter_path.is_file():
+        try:
+            import frontmatter
+
+            post = frontmatter.loads(front_matter_path.read_text(encoding="utf-8"))
+            md: dict[str, Any] = dict(post.metadata or {})
+            if "audience" in md:
+                fm_audience = str(md["audience"])
+            if "severity_ceiling" in md:
+                try:
+                    fm_severity = int(md["severity_ceiling"])
+                except (TypeError, ValueError) as e:
+                    raise ValueError(
+                        f"front-matter severity_ceiling in {front_matter_path} is not an int: {md['severity_ceiling']!r}"
+                    ) from e
+            if "dial_ceiling" in md:
+                try:
+                    fm_dial = float(md["dial_ceiling"])
+                except (TypeError, ValueError) as e:
+                    raise ValueError(
+                        f"front-matter dial_ceiling in {front_matter_path} is not a float: {md['dial_ceiling']!r}"
+                    ) from e
+            if "surface" in md:
+                fm_surface = str(md["surface"])
+        except ValueError:
+            raise
+        except Exception as e:  # yaml / frontmatter parse failure
+            warnings.append(f"front-matter parse failed for {front_matter_path}: {e}")
 
     # Precedence: CLI > front-matter > voice default.
     if cli_audience is not None:
@@ -152,7 +180,7 @@ def resolve_audience(
         surface_target=surface,
         closed=ceiling.closed,
         reason=ceiling.reason,
-        warnings=[],
+        warnings=warnings,
         source=source,
     )
 
