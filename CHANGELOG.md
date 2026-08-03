@@ -6,8 +6,10 @@
 - Pre-PR checklist to `AGENTS.md`.
 - Release helper groups bullets by Conventional Commit type into `### Added` / `### Fixed` / `### Changed`.
 
-### Changed
-- Marketplace development versioning now advances independently from engine and installed-plugin versions.
+### Removed
+- `tests/unit/test_repository_metadata.py`; repository-metadata regression coverage is external to this project.
+- Release helper's automatic marketplace patch-bump and changelog-entry injection; marketplace version returns to a hand-edited surface that follows engine releases.
+- `.claude-plugin/marketplace.json` version rolled back from `0.2.3` to `0.2.2` after the auto-bump machinery was removed.
 
 ### Fixed
 - Restored direct-fetch bare-repository configuration and removed stale remote-tracking refs.

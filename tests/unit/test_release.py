@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from scripts import release
@@ -153,62 +151,6 @@ def test_apply_transaction_succeeds_when_all_writes_pass(
     assert snapshots == {a: "original-a", b: "original-b"}
     assert a.read_text(encoding="utf-8") == "new-a"
     assert b.read_text(encoding="utf-8") == "new-b"
-
-
-def test_metadata_surfaces_excludes_plugin_pyproject() -> None:
-    """Vestigial ``claude-code/plugin/pyproject.toml`` must not be touched.
-
-    PR #9 removed the plugin-side pyproject; the release helper must not
-    carry a stale path that would fail with ``FileNotFoundError`` on the
-    next release.
-    """
-    labels = [label for label, _path, _mutator in release._metadata_surfaces("9.9.9", ())]
-    assert labels == [
-        "pyproject.toml",
-        "src/prose_craft/__init__.py",
-        "claude-code/plugin/.claude-plugin/plugin.json",
-        ".claude-plugin/marketplace.json",
-        "CHANGELOG.md",
-    ]
-
-
-def test_metadata_surfaces_patch_bumps_marketplace_independently(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    marketplace = tmp_path / "marketplace.json"
-    marketplace.write_text('{"version": "7.4.9"}\n', encoding="utf-8")
-    monkeypatch.setattr(release, "MARKETPLACE_JSON", marketplace)
-
-    surfaces = release._metadata_surfaces("9.9.9", ())
-    _label, _path, mutate = next(
-        item for item in surfaces if item[0] == ".claude-plugin/marketplace.json"
-    )
-    updated = mutate(marketplace.read_text(encoding="utf-8"))
-
-    assert json.loads(updated)["version"] == "7.4.10"
-
-
-@pytest.mark.parametrize("version", ["01.2.3", "1.2", "v1.2.3", "1.2.3-beta", ""])
-def test_read_json_version_rejects_noncanonical(tmp_path, version: str) -> None:
-    path = tmp_path / "marketplace.json"
-    path.write_text(json.dumps({"version": version}), encoding="utf-8")
-
-    with pytest.raises(RuntimeError, match="not canonical X.Y.Z"):
-        release._read_json_version(path)
-
-
-def test_metadata_surfaces_records_marketplace_bump_in_changelog(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    marketplace = tmp_path / "marketplace.json"
-    marketplace.write_text('{"version": "7.4.9"}\n', encoding="utf-8")
-    monkeypatch.setattr(release, "MARKETPLACE_JSON", marketplace)
-
-    surfaces = release._metadata_surfaces("9.9.9", ("fix: correct behavior",))
-    _label, _path, mutate = next(item for item in surfaces if item[0] == "CHANGELOG.md")
-    updated = mutate("# Changelog\n\n## [Unreleased]\n")
-
-    assert "- build(marketplace): advance development metadata to 7.4.10" in updated
 
 
 def test_release_commit_message_format() -> None:
