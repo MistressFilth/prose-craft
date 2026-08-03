@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -162,7 +163,7 @@ def _commits_since(tag: str | None) -> list[str]:
         capture_output=True,
         cwd=REPO_ROOT,
     )
-    return [block for block in result.stdout.split("\x00") if block.strip()]
+    return [block.lstrip() for block in result.stdout.split("\x00") if block.strip()]
 
 
 def _tag_exists_locally(tag: str) -> bool:
@@ -181,12 +182,13 @@ def _atomic_write(path: Path, content: str) -> None:
     """Write ``content`` to ``path`` via a sibling temp file + os.replace."""
     fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
     try:
-        with open(fd, "w", encoding="utf-8") as handle:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(content)
-        Path(tmp_name).replace(path)
     except Exception:
+        os.close(fd)
         Path(tmp_name).unlink(missing_ok=True)
         raise
+    Path(tmp_name).replace(path)
 
 
 def _set_pyproject_version_text(text: str, version: str) -> str:
@@ -324,11 +326,11 @@ def _commit_release(version: str, paths: Sequence[Path]) -> str:
     for path in paths:
         rel = path.relative_to(REPO_ROOT)
         _run(["git", "add", "--", str(rel)])
-    staged = _run(["git", "diff", "--cached", "--name-only"], capture=True).stdout.strip()
+    staged = _run(["git", "diff", "--cached", "--name-only"]).stdout.strip()
     if not staged:
         raise RuntimeError("no staged changes for release commit")
     _run(["git", "commit", "-m", _release_commit_message(version)])
-    return _run(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
+    return _run(["git", "rev-parse", "HEAD"]).stdout.strip()
 
 
 def _reset_release_commit() -> None:
