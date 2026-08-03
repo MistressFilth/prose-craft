@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Standardize Claude Code plugin layout under `claude-code/plugin/`.
+- Align package, runtime, plugin, and marketplace version metadata at `0.2.0`.
+- Add repository quality gates and release workflow documentation.
+
 ## [0.1.0] - 2026-08-01
 
 ### Changed

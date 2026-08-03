@@ -1,4 +1,4 @@
-.PHONY: init sync test unit-test features-test clean lint typecheck format check release help
+.PHONY: init sync test unit-test features-test clean lint typecheck format format-check check release help
 
 init:
 	uv sync --all-extras
@@ -27,12 +27,13 @@ typecheck:
 format:
 	uv run ruff format src tests
 
-check: lint typecheck format
+format-check:
+	uv run ruff format --check src tests
+
+check: lint typecheck format-check
 
 release:
-	uv run python -m build
-	git tag v$(uv version --short)
-	git push --tags
+	uv run python scripts/release.py
 
 help:
-	@echo "Targets: init sync unit-test features-test test clean lint typecheck format check release help"
+	@echo "Targets: init sync unit-test features-test test clean lint typecheck format format-check check release help"

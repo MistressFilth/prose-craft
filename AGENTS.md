@@ -2,7 +2,14 @@
 
 Repository for the prose-craft engine: a `pydantic-ai` CLI + FastMCP server
 for designing and applying prose voices, with a thin Claude Code plugin
-adapter.
+adapter at `claude-code/plugin/`.
+
+## Project Layout
+
+- `src/prose_craft/` — shipped engine.
+- `tests/` — unit and feature tests.
+- `claude-code/plugin/` — shipped Claude Code adapter.
+- `.claude-plugin/marketplace.json` — development marketplace manifest.
 
 ## Working memory
 
