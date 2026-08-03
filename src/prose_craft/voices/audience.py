@@ -11,11 +11,12 @@ context.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel
 
-from prose_craft.voices.model import NeverEntry, SurfaceFilter
+from prose_craft.voices.model import AudienceCeiling, AudiencesBlock, NeverEntry, SurfaceFilter
 
 Source = Literal["cli", "frontmatter", "voice_default"]
 
@@ -49,4 +50,111 @@ class ResolvedAudience(BaseModel):
     source: Source = "voice_default"
 
 
-__all__ = ["AudienceNotFoundError", "ResolvedAudience", "Source"]
+def _is_default_audiences(audiences: AudiencesBlock) -> bool:
+    """True when the user has not configured any audience ceilings.
+
+    The ``AudiencesBlock`` model ships defaults for ``private``,
+    ``team``, and ``external``, so absence of a custom audience block
+    on disk still surfaces as a populated ``AudiencesBlock`` in memory.
+    We treat the block as "unset" when the only fields present are
+    defaults: no custom audiences via ``extra="allow"`` and the three
+    built-in audiences are at their factory defaults.
+    """
+    if audiences.model_extra:
+        return False
+    default_ceiling = AudienceCeiling()
+    return (
+        audiences.private == default_ceiling
+        and audiences.team == default_ceiling
+        and audiences.external == default_ceiling
+    )
+
+
+def _most_permissive(audiences: AudiencesBlock) -> str | None:
+    """Return the audience name with the highest severity + dial ceiling."""
+    if _is_default_audiences(audiences):
+        return None
+    entries = audiences.entries()
+    # Severity tie broken by dial tie; both descending.
+    return max(
+        entries.keys(),
+        key=lambda n: (entries[n].severity_ceiling, entries[n].dial_ceiling),
+    )
+
+
+def resolve_audience(
+    voice_name: str,
+    *,
+    cli_audience: str | None = None,
+    cli_severity: int | None = None,
+    cli_dial: float | None = None,
+    cli_surface: str | None = None,
+    front_matter_path: Path | None = None,
+    voices_root: Path | None = None,
+) -> ResolvedAudience | None:
+    """Resolve audience context for a voice + call. Returns None when no audience applies."""
+    from prose_craft.voices.io import read_voice
+
+    profile = read_voice(voice_name, root=voices_root)
+    entries = profile.audiences.entries()
+
+    # Front-matter parsing is added in Task 3; for now skip it.
+    fm_audience = None
+    fm_severity = None
+    fm_dial = None
+    fm_surface = None
+
+    # Precedence: CLI > front-matter > voice default.
+    if cli_audience is not None:
+        name, source = cli_audience, "cli"
+    elif fm_audience is not None:
+        name, source = fm_audience, "frontmatter"
+    else:
+        name = _most_permissive(profile.audiences)
+        source = "voice_default"
+
+    # If voice has no audiences and no flag, skip entirely.
+    if name is None:
+        return None
+
+    # Validate audience is in the voice's audiences block.
+    if name not in entries:
+        raise AudienceNotFoundError(
+            voice=voice_name,
+            audience=name,
+            available=sorted(entries.keys()),
+        )
+
+    ceiling = entries[name]
+
+    # Flag overrides verbatim (caller responsibility).
+    severity = (
+        cli_severity
+        if cli_severity is not None
+        else (fm_severity if fm_severity is not None else ceiling.severity_ceiling)
+    )
+    dial = (
+        cli_dial
+        if cli_dial is not None
+        else (fm_dial if fm_dial is not None else ceiling.dial_ceiling)
+    )
+
+    surface = cli_surface if cli_surface is not None else fm_surface
+
+    # Never merge happens in Task 5; surface_filter.copy and closed/reason in Task 4.
+
+    return ResolvedAudience(
+        name=name,
+        voice_name=voice_name,
+        severity_ceiling=severity,
+        dial_ceiling=dial,
+        surface_filter=ceiling.surface_filter,
+        surface_target=surface,
+        closed=ceiling.closed,
+        reason=ceiling.reason,
+        warnings=[],
+        source=source,
+    )
+
+
+__all__ = ["AudienceNotFoundError", "ResolvedAudience", "Source", "resolve_audience"]
