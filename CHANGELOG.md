@@ -18,3 +18,10 @@
 ## [0.0.0] - 2026-07-14
 
 Initial release as a Claude Code plugin only.
+
+## [0.2.1] - 2026-08-03
+
+### Changed
+- fix(release): drop vestigial plugin pyproject from metadata surfaces
+
+
