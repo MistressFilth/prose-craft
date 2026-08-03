@@ -142,6 +142,7 @@ def test_all_repo_voices_parse():
 def test_all_shipped_voices_resolve_to_an_audience(tmp_path, monkeypatch):
     """Every shipped voice parses AND resolves to a valid ResolvedAudience."""
     from prose_craft.voices.audience import resolve_audience
+
     repo_root = Path(__file__).resolve().parent.parent.parent.parent
     voices_root = repo_root.parent / "voices"
     assert voices_root.is_dir()
@@ -153,6 +154,7 @@ def test_all_shipped_voices_resolve_to_an_audience(tmp_path, monkeypatch):
             continue
         # Each shipped voice has its own name; read it.
         from prose_craft.voices.io import read_voice_raw
+
         profile, _ = read_voice_raw(voice_dir.name, root=voices_root)
         resolved = resolve_audience(profile.voice, voices_root=voices_root)
         assert resolved is not None
@@ -188,6 +190,7 @@ def test_list_voices_falls_back_to_bundled(tmp_path, monkeypatch):
 
 def test_voice_init_template_includes_audiences_block():
     from prose_craft.data import load_template
+
     template = load_template()
     assert "audiences:" in template
     assert "private:" in template
@@ -203,6 +206,7 @@ def test_voice_init_scaffolds_audiences_block(tmp_path, monkeypatch):
     """voice_init writes a voice.md with the scaffolded audiences block."""
     from typer.testing import CliRunner
     from prose_craft.cli import app
+
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
     runner = CliRunner()
     result = runner.invoke(app, ["voice", "init", "new-voice"])
