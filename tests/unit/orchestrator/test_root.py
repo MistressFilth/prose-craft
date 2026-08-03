@@ -42,7 +42,7 @@ def test_prose_craft_lazy_build(monkeypatch: pytest.MonkeyPatch) -> None:
     # Inject a fake `prose_craft.agents.analyst` module so the deferred
     # `from prose_craft.agents.analyst import build_analyst` resolves.
     fake_module = types.ModuleType("prose_craft.agents.analyst")
-    fake_module.build_analyst = lambda _model: fake_agent  # noqa: ARG005
+    fake_module.build_analyst = lambda _model, **_: fake_agent  # noqa: ARG005
     monkeypatch.setitem(sys.modules, "prose_craft.agents.analyst", fake_module)
 
     craft = ProseCraft()
