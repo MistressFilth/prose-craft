@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.mypy_cache/
+.ty_cache/
 .ruff_cache/
 .ty_cache/
 dist/
@@ -10,11 +10,7 @@ build/
 *.egg-info/
 .superpowers/
 .superpowers.json
-
-# Pre-existing planning artifacts (kept locally, not shipped)
-docs/superpowers/drafts/
-docs/superpowers/plans/2026-07-26-*
-docs/superpowers/specs/2026-07-26-*
+docs/superpowers/
 
 # Harness artifacts
 AGENTS.local.md
