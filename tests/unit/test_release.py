@@ -227,3 +227,32 @@ def test_commit_release_raises_when_no_staged_changes(
     monkeypatch.setattr(release, "_run", fake_run)
     with pytest.raises(RuntimeError, match="no staged changes"):
         release._commit_release("0.2.1", [pyproject])
+
+
+def test_commits_since_strips_leading_newlines(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_commits_since`` must lstrip each block; ``%B`` adds a leading ``\\n``.
+
+    The git log format ``%B%x00`` produces ``<body>\\n\\x00<next body>...``.
+    When the next body starts with ``\\n`` (which ``%B`` emits as a
+    separator), the first ``splitlines()[0]`` is empty, so
+    ``classify_bump`` would silently drop the commit. ``_commits_since``
+    must ``lstrip`` each block to keep the subject on the first line.
+    """
+    monkeypatch.setattr(release, "REPO_ROOT", tmp_path)
+
+    fake = "chore: align lock\n\x00\nfix(release): close fd\n\x00feat: new endpoint\n"
+
+    class _FakeResult:
+        stdout = fake
+
+    def fake_subprocess_run(cmd, *args, **kwargs):
+        return _FakeResult()
+
+    monkeypatch.setattr(release.subprocess, "run", fake_subprocess_run)
+    blocks = release._commits_since("v0.0.0")
+    assert blocks == [
+        "chore: align lock\n",
+        "fix(release): close fd\n",
+        "feat: new endpoint\n",
+    ]
+    assert release.classify_bump(blocks) == "minor"
