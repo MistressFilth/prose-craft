@@ -6,7 +6,15 @@
 - Pre-PR checklist to `AGENTS.md`.
 - Release helper groups bullets by Conventional Commit type into `### Added` / `### Fixed` / `### Changed`.
 
+### Removed
+- `tests/unit/test_repository_metadata.py`; repository-metadata regression coverage is external to this project.
+- Release helper's automatic marketplace patch-bump and changelog-entry injection; marketplace version returns to a hand-edited surface that follows engine releases.
+- `.claude-plugin/marketplace.json` version rolled back from `0.2.3` to `0.2.2` after the auto-bump machinery was removed.
+
 ### Fixed
+- Restored direct-fetch bare-repository configuration and removed stale remote-tracking refs.
+- Repository history no longer contains prohibited co-author trailers after the staged `git filter-repo` rewrite.
+- Restored the formatting CI gate for voice-check feature tests.
 - Release helper no longer leaks `Co-authored-by:` footers, `---------` squash-merge separators, or `BREAKING CHANGE:` footers into changelog bullets.
 - Release helper classifies `fix:` commits under `### Fixed` instead of `### Changed`.
 

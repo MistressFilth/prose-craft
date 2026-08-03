@@ -153,17 +153,6 @@ def test_apply_transaction_succeeds_when_all_writes_pass(
     assert b.read_text(encoding="utf-8") == "new-b"
 
 
-def test_metadata_surfaces_excludes_plugin_pyproject() -> None:
-    """Vestigial ``claude-code/plugin/pyproject.toml`` must not be touched.
-
-    PR #9 removed the plugin-side pyproject; the release helper must not
-    carry a stale path that would fail with ``FileNotFoundError`` on the
-    next release.
-    """
-    labels = [label for label, _path, _mutator in release._metadata_surfaces("9.9.9", ())]
-    assert "claude-code/plugin/pyproject.toml" not in labels
-
-
 def test_release_commit_message_format() -> None:
     """Release commit message is a Conventional Commit with body."""
     msg = release._release_commit_message("0.2.1")
