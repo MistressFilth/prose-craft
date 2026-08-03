@@ -41,6 +41,7 @@ from prose_craft import __version__
 from prose_craft.agents.results import VoiceDelta
 from prose_craft.config import get_model, get_voices_root
 from prose_craft.orchestrator.root import ProseCraft
+from prose_craft.voices.audience import AudienceNotFoundError
 from prose_craft.voices.io import (
     VoiceProfileNotFound,
     list_voices,
@@ -81,6 +82,9 @@ def _handle_errors(func: Any) -> Any:
         except VoiceProfileNotFound as exc:
             typer.echo(str(exc), err=True)
             typer.echo("Run `prose voice list` to see available voices.", err=True)
+            raise typer.Exit(code=2) from exc
+        except AudienceNotFoundError as exc:
+            typer.echo(str(exc), err=True)
             raise typer.Exit(code=2) from exc
         except Exception:
             traceback.print_exc(file=sys.stderr)
@@ -151,9 +155,11 @@ def voice_show(
     """Print a voice profile as markdown or raw file."""
     root = _voices_root_opt(voices_root)
     if raw:
-        path = voice_path(name, root=root)
-        if not path.exists():
-            raise typer.BadParameter(f"voice {name!r} not found at {path}")
+        from prose_craft.voices.io import _resolve_voice_path
+
+        path = _resolve_voice_path(name, root)
+        if path is None:
+            raise typer.BadParameter(f"voice {name!r} not found at {voice_path(name, root=root)}")
         typer.echo(path.read_text(encoding="utf-8"))
         return
     profile, body = read_voice_raw(name, root=root)
@@ -515,13 +521,34 @@ def voice_draft(
     brief: str = typer.Argument(..., help="The brief to write to."),
     to: Path | None = typer.Option(None, "--to", help="Output file; defaults to stdout."),
     voices_root: Path | None = typer.Option(None, "--voices-root"),
+    audience: str | None = typer.Option(
+        None, "--audience", help="Audience name (private/team/external/...)."
+    ),
+    severity: int | None = typer.Option(
+        None,
+        "--severity",
+        help="Severity ceiling 0-5 (overrides audience).",
+        min=0,
+        max=5,
+    ),
+    dial: float | None = typer.Option(
+        None,
+        "--dial",
+        help="Dial ceiling 0.0-1.0 (overrides audience).",
+        min=0.0,
+        max=1.0,
+    ),
+    surface: str | None = typer.Option(
+        None, "--surface", help="Target surface (e.g. memo/rfc/tweet)."
+    ),
 ) -> None:
     """Draft prose in the named voice."""
     import tempfile
 
     from prose_craft.orchestrator.deps import StylistDeps
+    from prose_craft.voices.audience import resolve_audience
 
-    _voices_root_opt(voices_root)  # honor the override for env consistency
+    root = _voices_root_opt(voices_root)  # honor the override for env consistency
     # The stylist reads/writes the target file. The CLI seeds an empty
     # file at --to if given; the agent writes into it.
     if to is not None:
@@ -534,10 +561,28 @@ def voice_draft(
             file_path = Path(tmp.name)
             file_path.write_text("", encoding="utf-8")
 
+    resolved = resolve_audience(
+        name,
+        cli_audience=audience,
+        cli_severity=severity,
+        cli_dial=dial,
+        cli_surface=surface,
+        front_matter_path=file_path,
+        voices_root=root,
+    )
+    for w in resolved.warnings if resolved else []:
+        typer.echo(f"warning: {w}", err=True)
+
     craft = ProseCraft()
-    result = craft.voice_stylist().run_sync(
+    result = craft.voice_stylist(audience=resolved).run_sync(
         f"Draft prose in voice {name!r}. Brief: {brief}",
-        deps=StylistDeps(file_path=file_path, voice_name=name, brief=brief, mode="draft"),
+        deps=StylistDeps(
+            file_path=file_path,
+            voice_name=name,
+            brief=brief,
+            mode="draft",
+            audience=resolved,
+        ),
     )
     if to is None:
         typer.echo(result.output.text)
@@ -550,15 +595,54 @@ def voice_edit(
     voice: str = typer.Option(..., "--voice"),  # noqa: B008
     in_place: bool = typer.Option(False, "--in-place"),
     voices_root: Path | None = typer.Option(None, "--voices-root"),
+    audience: str | None = typer.Option(
+        None, "--audience", help="Audience name (private/team/external/...)."
+    ),
+    severity: int | None = typer.Option(
+        None,
+        "--severity",
+        help="Severity ceiling 0-5 (overrides audience).",
+        min=0,
+        max=5,
+    ),
+    dial: float | None = typer.Option(
+        None,
+        "--dial",
+        help="Dial ceiling 0.0-1.0 (overrides audience).",
+        min=0.0,
+        max=1.0,
+    ),
+    surface: str | None = typer.Option(
+        None, "--surface", help="Target surface (e.g. memo/rfc/tweet)."
+    ),
 ) -> None:
     """Edit a file in the named voice."""
     from prose_craft.orchestrator.deps import StylistDeps
+    from prose_craft.voices.audience import resolve_audience
 
-    _voices_root_opt(voices_root)  # validate root exists
+    root = _voices_root_opt(voices_root)  # validate root exists
+
+    resolved = resolve_audience(
+        voice,
+        cli_audience=audience,
+        cli_severity=severity,
+        cli_dial=dial,
+        cli_surface=surface,
+        front_matter_path=file,
+        voices_root=root,
+    )
+    for w in resolved.warnings if resolved else []:
+        typer.echo(f"warning: {w}", err=True)
+
     craft = ProseCraft()
-    result = craft.voice_stylist().run_sync(
+    result = craft.voice_stylist(audience=resolved).run_sync(
         "Edit this prose in the named voice.",
-        deps=StylistDeps(file_path=file, voice_name=voice, mode="edit"),
+        deps=StylistDeps(
+            file_path=file,
+            voice_name=voice,
+            mode="edit",
+            audience=resolved,
+        ),
     )
     if in_place and result.output.text:
         file.write_text(result.output.text, encoding="utf-8")
