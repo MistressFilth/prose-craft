@@ -18,7 +18,9 @@ from prose_craft.orchestrator.deps import AnalysisDeps
 from prose_craft.orchestrator.prompts import ANALYST_SYSTEM_PROMPT, format_audience_block
 
 
-def build_analyst(model: str, *, audience: ResolvedAudience | None = None) -> Agent[AnalysisDeps, ProseDiagnostic]:
+def build_analyst(
+    model: str, *, audience: ResolvedAudience | None = None
+) -> Agent[AnalysisDeps, ProseDiagnostic]:
     """Construct the analyst agent."""
     rendered = ANALYST_SYSTEM_PROMPT.format(audience_block=format_audience_block(audience))
     return make_sub_agent(

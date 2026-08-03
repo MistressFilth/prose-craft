@@ -507,7 +507,7 @@ def _voice_compose_repl(name: str, root: Path) -> None:
         "never",
     ]
     field_index = 0
-    craft = ProseCraft()
+    craft = ProseCraft(voices_root=root)
     agent = craft.voice_composer()
 
     while field_index < len(fields):
@@ -632,7 +632,7 @@ def voice_draft(
     for w in resolved.warnings if resolved else []:
         typer.echo(f"warning: {w}", err=True)
 
-    craft = ProseCraft()
+    craft = ProseCraft(voices_root=root)
     result = craft.voice_stylist(audience=resolved).run_sync(
         f"Draft prose in voice {name!r}. Brief: {brief}",
         deps=StylistDeps(
@@ -693,7 +693,7 @@ def voice_edit(
     for w in resolved.warnings if resolved else []:
         typer.echo(f"warning: {w}", err=True)
 
-    craft = ProseCraft()
+    craft = ProseCraft(voices_root=root)
     result = craft.voice_stylist(audience=resolved).run_sync(
         "Edit this prose in the named voice.",
         deps=StylistDeps(

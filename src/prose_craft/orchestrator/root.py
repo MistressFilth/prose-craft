@@ -114,7 +114,10 @@ class ProseCraft:
         from prose_craft.agents.voice_checker import build_voice_checker
 
         return self._lazy(
-            "voice_checker", lambda: build_voice_checker(self.model, audience=audience)
+            "voice_checker",
+            lambda: build_voice_checker(
+                self.model, audience=audience, voices_root=self.voices_root
+            ),
         )
 
     def voice_stylist(
@@ -123,7 +126,10 @@ class ProseCraft:
         from prose_craft.agents.voice_stylist import build_voice_stylist
 
         return self._lazy(
-            "voice_stylist", lambda: build_voice_stylist(self.model, audience=audience)
+            "voice_stylist",
+            lambda: build_voice_stylist(
+                self.model, audience=audience, voices_root=self.voices_root
+            ),
         )
 
     def voice_composer(

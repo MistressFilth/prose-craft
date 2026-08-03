@@ -13,7 +13,9 @@ from prose_craft.orchestrator.deps import ArchitectDeps
 from prose_craft.orchestrator.prompts import ARCHITECT_SYSTEM_PROMPT, format_audience_block
 
 
-def build_architect(model: str, *, audience: ResolvedAudience | None = None) -> Agent[ArchitectDeps, ArchitectResult]:
+def build_architect(
+    model: str, *, audience: ResolvedAudience | None = None
+) -> Agent[ArchitectDeps, ArchitectResult]:
     """Construct the architect agent."""
     rendered = ARCHITECT_SYSTEM_PROMPT.format(audience_block=format_audience_block(audience))
     return make_sub_agent(

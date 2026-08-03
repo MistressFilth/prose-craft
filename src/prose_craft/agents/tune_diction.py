@@ -13,7 +13,9 @@ from prose_craft.orchestrator.deps import TuneDeps
 from prose_craft.orchestrator.prompts import TUNE_DICTION_SYSTEM_PROMPT, format_audience_block
 
 
-def build_tune_diction(model: str, *, audience: ResolvedAudience | None = None) -> Agent[TuneDeps, SubstitutionPlan]:
+def build_tune_diction(
+    model: str, *, audience: ResolvedAudience | None = None
+) -> Agent[TuneDeps, SubstitutionPlan]:
     """Construct the tune-diction agent."""
     rendered = TUNE_DICTION_SYSTEM_PROMPT.format(audience_block=format_audience_block(audience))
     return make_sub_agent(
