@@ -51,6 +51,8 @@ from prose_craft.voices.io import (
 )
 from prose_craft.voices.location import voice_path
 from prose_craft.voices.model import (
+    AudienceCeiling,
+    AudiencesBlock,
     DictionConfig,
     LexiconConfig,
     RegisterAxes,
@@ -435,6 +437,12 @@ def voice_init(
         syntax=SyntaxConfig(),
         lexicon=LexiconConfig(),
         structure=StructureConfig(),
+        audiences=AudiencesBlock(
+            rationale="<why this voice has separate ceilings per audience>",
+            private=AudienceCeiling(severity_ceiling=5, dial_ceiling=1.0),
+            team=AudienceCeiling(severity_ceiling=5, dial_ceiling=1.0),
+            external=AudienceCeiling(severity_ceiling=4, dial_ceiling=1.0),
+        ),
     )
     prose_body = body.split("---\n", 2)[2] if body.count("---") >= 2 else "\n"
     write_voice(profile, prose_body, root=root)

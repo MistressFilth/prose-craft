@@ -177,6 +177,22 @@ def test_voice_init_template_includes_audiences_block():
     assert "severity_ceiling: 4" in template
 
 
+def test_voice_init_scaffolds_audiences_block(tmp_path, monkeypatch):
+    """voice_init writes a voice.md with the scaffolded audiences block."""
+    from typer.testing import CliRunner
+    from prose_craft.cli import app
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    runner = CliRunner()
+    result = runner.invoke(app, ["voice", "init", "new-voice"])
+    assert result.exit_code == 0, result.output
+    voice_md = tmp_path / "new-voice" / "voice.md"
+    text = voice_md.read_text(encoding="utf-8")
+    assert "audiences:" in text
+    assert "private:" in text
+    assert "team:" in text
+    assert "external:" in text
+
+
 def test_resolve_voice_path_falls_back_to_bundled(tmp_path, monkeypatch):
     """``_resolve_voice_path`` finds bundled voices when user root is empty."""
     from prose_craft.voices import io, location
