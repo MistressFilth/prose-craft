@@ -1,10 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "prose-craft",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "pydantic-ai engine for designing and applying prose voices, with a thin Claude Code plugin adapter.",
   "owner": { "name": "MistressFilth" },
   "plugins": [
-    { "name": "prose-craft", "source": "./plugin/" }
+    { "name": "prose-craft", "source": "./claude-code/plugin/" }
   ]
 }
