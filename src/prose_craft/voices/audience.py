@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from prose_craft.voices.model import AudienceCeiling, AudiencesBlock, NeverEntry, SurfaceFilter
+from prose_craft.voices.model import AudiencesBlock, NeverEntry, SurfaceFilter
 
 Source = Literal["cli", "frontmatter", "voice_default"]
 
@@ -50,29 +50,16 @@ class ResolvedAudience(BaseModel):
     source: Source = "voice_default"
 
 
-def _is_default_audiences(audiences: AudiencesBlock) -> bool:
-    """True when the user has not configured any audience ceilings.
-
-    The ``AudiencesBlock`` model ships defaults for ``private``,
-    ``team``, and ``external``, so absence of a custom audience block
-    on disk still surfaces as a populated ``AudiencesBlock`` in memory.
-    We treat the block as "unset" when the only fields present are
-    defaults: no custom audiences via ``extra="allow"`` and the three
-    built-in audiences are at their factory defaults.
-    """
-    if audiences.model_extra:
-        return False
-    default_ceiling = AudienceCeiling()
-    return (
-        audiences.private == default_ceiling
-        and audiences.team == default_ceiling
-        and audiences.external == default_ceiling
-    )
-
-
 def _most_permissive(audiences: AudiencesBlock) -> str | None:
-    """Return the audience name with the highest severity + dial ceiling."""
-    if _is_default_audiences(audiences):
+    """Return the audience name with the highest severity + dial ceiling.
+
+    Returns ``None`` when the block was not configured at all — i.e. the
+    voice YAML has no ``audiences:`` key (so ``model_fields_set`` is
+    empty). When any field is set explicitly (even to a default value),
+    the block is considered configured and the most permissive entry
+    wins.
+    """
+    if not audiences.model_fields_set:
         return None
     entries = audiences.entries()
     # Severity tie broken by dial tie; both descending.

@@ -92,7 +92,26 @@ def _write_voice(root: Path, name: str, audiences: AudiencesBlock) -> Path:
 
 def test_resolve_returns_none_when_no_audiences_and_no_flag(tmp_path):
     root = tmp_path
-    _write_voice(root, "minimal", AudiencesBlock())
+    # Write a minimal voice file with no `audiences:` key on disk; the
+    # resolver relies on ``model_fields_set`` to distinguish an absent
+    # block from a configured one, and ``write_voice`` always serializes
+    # the default ``AudiencesBlock``, so we go around it.
+    voice_dir = root / "minimal"
+    voice_dir.mkdir(parents=True)
+    (voice_dir / "voice.md").write_text(
+        "---\n"
+        "voice: minimal\n"
+        "created: 2026-08-01\n"
+        "updated: 2026-08-01\n"
+        "register: {}\n"
+        "diction: {}\n"
+        "rhythm: {}\n"
+        "syntax: {}\n"
+        "lexicon: {}\n"
+        "structure: {}\n"
+        "---\n",
+        encoding="utf-8",
+    )
     result = resolve_audience("minimal", voices_root=root)
     assert result is None
 
@@ -189,7 +208,7 @@ def test_resolve_front_matter_severity_and_dial(tmp_path):
 
 def test_resolve_front_matter_invalid_type_raises(tmp_path):
     root = tmp_path
-    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=3))
+    audiences = AudiencesBlock(team=AudienceCeiling())
     _write_voice(root, "test", audiences)
     brief = tmp_path / "brief.md"
     brief.write_text("---\nseverity_ceiling: high\n---\n", encoding="utf-8")
@@ -199,7 +218,7 @@ def test_resolve_front_matter_invalid_type_raises(tmp_path):
 
 def test_resolve_front_matter_parse_error_falls_through(tmp_path):
     root = tmp_path
-    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=3))
+    audiences = AudiencesBlock(team=AudienceCeiling())
     _write_voice(root, "test", audiences)
     brief = tmp_path / "brief.md"
     # Broken YAML — falls through to voice default.
@@ -212,7 +231,7 @@ def test_resolve_front_matter_parse_error_falls_through(tmp_path):
 
 def test_resolve_surface_from_front_matter(tmp_path):
     root = tmp_path
-    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=3))
+    audiences = AudiencesBlock(team=AudienceCeiling())
     _write_voice(root, "test", audiences)
     brief = tmp_path / "brief.md"
     brief.write_text("---\nsurface: rfc\n---\n", encoding="utf-8")
@@ -223,7 +242,7 @@ def test_resolve_surface_from_front_matter(tmp_path):
 
 def test_resolve_cli_surface_overrides_front_matter(tmp_path):
     root = tmp_path
-    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=3))
+    audiences = AudiencesBlock(team=AudienceCeiling())
     _write_voice(root, "test", audiences)
     brief = tmp_path / "brief.md"
     brief.write_text("---\nsurface: rfc\n---\n", encoding="utf-8")
