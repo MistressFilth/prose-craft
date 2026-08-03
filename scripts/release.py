@@ -205,9 +205,68 @@ def _set_json_version_text(text: str, version: str) -> str:
     return json.dumps(data, indent=2) + "\n"
 
 
+def _strip_footer(block: str) -> str:
+    """Drop ``Co-authored-by`` / ``Co-Authored-By`` / ``BREAKING CHANGE:`` footers.
+
+    Footers live on their own lines near the end of a commit body. A
+    well-formed block keeps them on lines by themselves; we drop every
+    line that matches the canonical trailer pattern.
+    """
+    return "\n".join(
+        line
+        for line in block.splitlines()
+        if not re.match(r"^(Co-authored-by|Co-Authored-By|BREAKING CHANGE):", line, re.IGNORECASE)
+    )
+
+
+def _classify_commit(subject: str) -> str:
+    """Map a Conventional Commit type token to a Keep-a-Changelog group.
+
+    Returns one of ``Added`` (feat), ``Changed`` (refactor, perf, chore,
+    docs, test, build, ci, style), ``Fixed`` (fix), or ``Changed`` as
+    the default for unrecognized tokens.
+    """
+    type_token = subject.split(":", 1)[0]
+    if type_token.startswith("feat"):
+        return "Added"
+    if type_token.startswith("fix"):
+        return "Fixed"
+    if type_token.startswith(("refactor", "perf", "chore", "docs", "test", "build", "ci", "style")):
+        return "Changed"
+    return "Changed"
+
+
+def _group_bullets(bodies: Sequence[str]) -> dict[str, list[str]]:
+    """Bucket commit subjects into Keep-a-Changelog groups.
+
+    Skips ``chore(release):`` commits (the release-helper's own commit)
+    so the changelog only records the underlying changes, not the
+    release plumbing. Strips trailers from every subject before
+    classifying.
+    """
+    groups: dict[str, list[str]] = {"Added": [], "Changed": [], "Fixed": []}
+    for raw in bodies:
+        subject = _strip_footer(raw).splitlines()
+        if not subject or not subject[0].strip():
+            continue
+        first = subject[0].strip()
+        if first.startswith("chore(release):"):
+            continue
+        groups[_classify_commit(first)].append(f"- {first}")
+    return groups
+
+
 def _render_changelog_section(version: str, date: str, bodies: Sequence[str]) -> str:
-    bullets = "\n".join(f"- {body}" for body in bodies) if bodies else "- No notable changes."
-    return f"## [{version}] - {date}\n\n### Changed\n{bullets}\n\n"
+    groups = _group_bullets(bodies)
+    body_parts: list[str] = []
+    for group_name in ("Added", "Changed", "Fixed"):
+        bullets = groups[group_name]
+        if not bullets:
+            continue
+        body_parts.append(f"### {group_name}\n" + "\n".join(bullets))
+    if not body_parts:
+        body_parts = ["### Changed\n- No notable changes."]
+    return f"## [{version}] - {date}\n\n" + "\n\n".join(body_parts) + "\n\n"
 
 
 def _update_changelog_text(text: str, version: str, date: str, subjects: Sequence[str]) -> str:

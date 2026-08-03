@@ -256,3 +256,73 @@ def test_commits_since_strips_leading_newlines(tmp_path, monkeypatch: pytest.Mon
         "feat: new endpoint\n",
     ]
     assert release.classify_bump(blocks) == "minor"
+
+
+def test_strip_footer_drops_coauthored_and_breaking() -> None:
+    block = (
+        "fix: close fd\n"
+        "\n"
+        "Body line one.\n"
+        "Body line two.\n"
+        "\n"
+        "Co-authored-by: Claude <noreply@anthropic.com>\n"
+        "Co-Authored-By: v0idbit <>\n"
+        "BREAKING CHANGE: behavior changed\n"
+    )
+    assert release._strip_footer(block) == "fix: close fd\n\nBody line one.\nBody line two."
+
+
+def test_classify_commit() -> None:
+    assert release._classify_commit("feat: add endpoint") == "Added"
+    assert release._classify_commit("fix: correct path") == "Fixed"
+    assert release._classify_commit("refactor: split module") == "Changed"
+    assert release._classify_commit("chore: clean metadata") == "Changed"
+    assert release._classify_commit("docs: update readme") == "Changed"
+    assert release._classify_commit("perf: cache results") == "Changed"
+    assert release._classify_commit("test: add coverage") == "Changed"
+    assert release._classify_commit("build: bump deps") == "Changed"
+    assert release._classify_commit("ci: add workflow") == "Changed"
+    assert release._classify_commit("style: format") == "Changed"
+    assert release._classify_commit("unknown: thing") == "Changed"
+
+
+def test_group_bullets_skips_release_helper_commit() -> None:
+    bodies = [
+        "feat: new endpoint\n",
+        "fix(release): close fd\n",
+        "chore(release): 0.2.2 via guarded release helper\n",
+        "fix: correct path\n",
+    ]
+    groups = release._group_bullets(bodies)
+    assert groups["Added"] == ["- feat: new endpoint"]
+    assert groups["Fixed"] == ["- fix(release): close fd", "- fix: correct path"]
+    assert groups["Changed"] == []
+
+
+def test_group_bullets_strips_trailers_from_subjects() -> None:
+    bodies = [
+        "feat: new endpoint\n\nCo-authored-by: Claude <noreply@anthropic.com>\n",
+    ]
+    groups = release._group_bullets(bodies)
+    assert groups["Added"] == ["- feat: new endpoint"]
+
+
+def test_render_changelog_section_groups_and_orders() -> None:
+    bodies = [
+        "fix: correct path\n",
+        "feat: new endpoint\n",
+        "chore(release): 0.2.3 via guarded release helper\n",
+    ]
+    section = release._render_changelog_section("0.2.3", "2026-08-04", bodies)
+    assert section.startswith("## [0.2.3] - 2026-08-04\n\n")
+    assert "### Added\n- feat: new endpoint" in section
+    assert "### Fixed\n- fix: correct path" in section
+    assert "chore(release):" not in section
+    # Added appears before Fixed (Keep-a-Changelog order)
+    assert section.index("### Added") < section.index("### Fixed")
+
+
+def test_render_changelog_section_falls_back_when_empty() -> None:
+    section = release._render_changelog_section("0.2.3", "2026-08-04", ())
+    assert "- No notable changes." in section
+    assert "### Changed" in section
