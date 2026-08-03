@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from fastmcp import Client
@@ -13,6 +15,7 @@ import prose_craft.mcp as mcp_module
 from prose_craft.agents.results import (
     ArchitectResult,
     EditResult,
+    ProseDiagnostic,
     SubstitutionPlan,
     VoiceDelta,
 )
@@ -34,10 +37,13 @@ class _FakeAgent:
 
 
 class _FakeCraft:
-    def editor(self) -> _FakeAgent:
+    def analyst(self, **_kwargs: object) -> _FakeAgent:
+        return _FakeAgent(ProseDiagnostic(metrics=None, issues=[]))
+
+    def editor(self, **_kwargs: object) -> _FakeAgent:
         return _FakeAgent(EditResult(change_log="deterministic edit"))
 
-    def architect(self) -> _FakeAgent:
+    def architect(self, **_kwargs: object) -> _FakeAgent:
         return _FakeAgent(
             ArchitectResult(
                 analysis="deterministic analysis",
@@ -46,26 +52,42 @@ class _FakeCraft:
             )
         )
 
-    def tune_diction(self) -> _FakeAgent:
+    def tune_diction(self, **_kwargs: object) -> _FakeAgent:
         return _FakeAgent(SubstitutionPlan(voice_weighted=True))
 
-    def voice_composer(self) -> _FakeAgent:
+    def voice_composer(self, **_kwargs: object) -> _FakeAgent:
         return _FakeAgent([VoiceDelta(field="purpose", value="test voice", prompt="test prompt")])
 
 
-def _tool_text(result: object) -> str:
-    return str(result.content[0].text)  # type: ignore[union-attr]
+def _tool_text(result: Any) -> str:
+    return str(result.content[0].text)
 
 
-def _tool_json(result: object) -> dict[str, object]:
+def _tool_json(result: Any) -> dict[str, Any]:
     return json.loads(_tool_text(result))
 
 
-def _resource_text(result: list[object]) -> str:
-    return str(result[0].text)  # type: ignore[union-attr]
+def _resource_text(result: Sequence[Any]) -> str:
+    return str(result[0].text)
 
 
-def _write_voice(root: Path, name: str = "MistressFilth", *, banned: str = "[]") -> str:
+def _write_voice(
+    root: Path,
+    name: str = "MistressFilth",
+    *,
+    banned: str = "[]",
+    with_audiences: bool = False,
+) -> str:
+    audiences = (
+        "audiences:\n"
+        "  external:\n"
+        "    severity_ceiling: 4\n"
+        "    dial_ceiling: 0.8\n"
+        "    surface_filter:\n"
+        "      close: [memo]\n"
+        if with_audiences
+        else ""
+    )
     text = (
         "---\n"
         f"voice: {name}\n"
@@ -79,6 +101,7 @@ def _write_voice(root: Path, name: str = "MistressFilth", *, banned: str = "[]")
         "syntax: {}\n"
         "lexicon: {}\n"
         "structure: {}\n"
+        f"{audiences}"
         "---\n"
     )
     voice_file = root / name / "voice.md"
@@ -286,6 +309,159 @@ async def test_mcp_voice_compose_step_tool(
         result = await mcp_client.call_tool(
             "voice_compose_step",
             {"name": "test-voice", "current_field": "purpose"},
+        )
+        data = json.loads(_tool_text(result))
+        assert data == [{"field": "purpose", "value": "test voice", "prompt": "test prompt"}]
+
+
+@pytest.mark.asyncio
+async def test_mcp_voice_check_accepts_audience_param(
+    mcp_client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """voice_check resolves supplied audience knobs and applies the target surface."""
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    _write_voice(tmp_path, with_audiences=True)
+    draft = tmp_path / "draft.md"
+    draft.write_text("A draft.", encoding="utf-8")
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "voice_check",
+            {
+                "file_path": str(draft),
+                "voice": "MistressFilth",
+                "audience": "external",
+                "severity_ceiling": 2,
+                "dial_ceiling": 0.4,
+                "surface": "memo",
+            },
+        )
+        data = _tool_json(result)
+        audience = data["audience"]
+        assert isinstance(audience, dict)
+        assert audience["name"] == "external"
+        assert audience["severity_ceiling"] == 2
+        assert audience["dial_ceiling"] == 0.4
+        assert audience["surface_target"] == "memo"
+        assert any(
+            finding["rule"] == "audience.surface_filter.close.memo"
+            for finding in data["mechanical"]
+        )
+
+
+@pytest.mark.asyncio
+async def test_mcp_analyze_prose_accepts_audience_param(
+    mcp_client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    _write_voice(tmp_path, with_audiences=True)
+    _patch_fake_craft(monkeypatch)
+    draft = tmp_path / "draft.md"
+    draft.write_text("A draft.", encoding="utf-8")
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "analyze_prose",
+            {
+                "file_path": str(draft),
+                "voice": "MistressFilth",
+                "audience": "external",
+                "severity_ceiling": 2,
+                "dial_ceiling": 0.4,
+                "surface": "memo",
+            },
+        )
+        assert "issues" in _tool_json(result)
+
+
+@pytest.mark.asyncio
+async def test_mcp_edit_prose_accepts_audience_param(
+    mcp_client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    _write_voice(tmp_path, with_audiences=True)
+    _patch_fake_craft(monkeypatch)
+    draft = tmp_path / "draft.md"
+    draft.write_text("A draft.", encoding="utf-8")
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "edit_prose",
+            {
+                "file_path": str(draft),
+                "voice": "MistressFilth",
+                "audience": "external",
+                "severity_ceiling": 2,
+                "dial_ceiling": 0.4,
+                "surface": "memo",
+            },
+        )
+        assert _tool_json(result)["change_log"] == "deterministic edit"
+
+
+@pytest.mark.asyncio
+async def test_mcp_architect_prose_accepts_audience_param(
+    mcp_client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    _write_voice(tmp_path, with_audiences=True)
+    _patch_fake_craft(monkeypatch)
+    draft = tmp_path / "draft.md"
+    draft.write_text("A draft.", encoding="utf-8")
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "architect_prose",
+            {
+                "file_path": str(draft),
+                "voice": "MistressFilth",
+                "audience": "external",
+                "severity_ceiling": 2,
+                "dial_ceiling": 0.4,
+                "surface": "memo",
+            },
+        )
+        assert _tool_json(result)["diagnosis"] == "deterministic diagnosis"
+
+
+@pytest.mark.asyncio
+async def test_mcp_tune_diction_accepts_audience_param(
+    mcp_client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    _write_voice(tmp_path, with_audiences=True)
+    _patch_fake_craft(monkeypatch)
+    draft = tmp_path / "draft.md"
+    draft.write_text("A draft.", encoding="utf-8")
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "tune_diction",
+            {
+                "file_path": str(draft),
+                "voice": "MistressFilth",
+                "audience": "external",
+                "severity_ceiling": 2,
+                "dial_ceiling": 0.4,
+                "surface": "memo",
+            },
+        )
+        assert _tool_json(result)["voice_weighted"] is True
+
+
+@pytest.mark.asyncio
+async def test_mcp_voice_compose_step_accepts_audience_param(
+    mcp_client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    _write_voice(tmp_path, name="test-voice", with_audiences=True)
+    _patch_fake_craft(monkeypatch)
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "voice_compose_step",
+            {
+                "name": "test-voice",
+                "current_field": "purpose",
+                "audience": "external",
+                "severity_ceiling": 2,
+                "dial_ceiling": 0.4,
+                "surface": "memo",
+            },
         )
         data = json.loads(_tool_text(result))
         assert data == [{"field": "purpose", "value": "test voice", "prompt": "test prompt"}]

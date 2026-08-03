@@ -17,8 +17,9 @@ from prose_craft.orchestrator.deps import (
     TuneDeps,
 )
 from prose_craft.orchestrator.root import ProseCraft
+from prose_craft.voices.audience import ResolvedAudience, resolve_audience
 from prose_craft.voices.check import check_voice
-from prose_craft.voices.io import list_voices, read_voice, read_voice_file
+from prose_craft.voices.io import VoiceProfileNotFound, list_voices, read_voice, read_voice_file
 
 mcp = FastMCP("prose-craft")
 
@@ -33,16 +34,36 @@ async def analyze_prose(
     voice: str | None = None,
     tolerance: Literal["strict", "normal", "relaxed"] = "normal",
     metrics_only: bool = False,
+    audience: str | None = None,
+    severity_ceiling: int | None = None,
+    dial_ceiling: float | None = None,
+    surface: str | None = None,
 ) -> dict[str, object]:
     """Run the prose analyst. Returns ProseDiagnostic as JSON."""
+    resolved: ResolvedAudience | None = None
+    if voice is not None:
+        resolved = resolve_audience(
+            voice,
+            cli_audience=audience,
+            cli_severity=severity_ceiling,
+            cli_dial=dial_ceiling,
+            cli_surface=surface,
+            front_matter_path=Path(file_path),
+            voices_root=None,
+        )
     if metrics_only:
         from prose_craft.analysis.metrics import analyze_prose
         from prose_craft.agents.results import ProseDiagnostic
 
         m = analyze_prose(Path(file_path).read_text(encoding="utf-8"))
         return ProseDiagnostic(metrics=m, issues=[]).model_dump(mode="json")
-    deps = AnalysisDeps(file_path=Path(file_path), voice_name=voice, tolerance=tolerance)
-    result = await _craft().analyst().run("Analyze this prose.", deps=deps)
+    deps = AnalysisDeps(
+        file_path=Path(file_path),
+        voice_name=voice,
+        tolerance=tolerance,
+        audience=resolved,
+    )
+    result = await _craft().analyst(audience=resolved).run("Analyze this prose.", deps=deps)
     return result.output.model_dump(mode="json")
 
 
@@ -52,11 +73,30 @@ async def voice_check(
     voice: str,
     tolerance: Literal["strict", "normal", "relaxed"] = "normal",
     brief_path: str | None = None,
+    audience: str | None = None,
+    severity_ceiling: int | None = None,
+    dial_ceiling: float | None = None,
+    surface: str | None = None,
 ) -> dict[str, object]:
     """Deterministic voice check. Returns VoiceVerdict as JSON."""
+    resolved = resolve_audience(
+        voice,
+        cli_audience=audience,
+        cli_severity=severity_ceiling,
+        cli_dial=dial_ceiling,
+        cli_surface=surface,
+        front_matter_path=Path(file_path),
+        voices_root=None,
+    )
     profile = read_voice(voice)
     text = Path(file_path).read_text(encoding="utf-8")
-    verdict = check_voice(text, profile, tolerance=tolerance)
+    verdict = check_voice(
+        text,
+        profile,
+        tolerance=tolerance,
+        audience=resolved,
+        surface=resolved.surface_target if resolved is not None else surface,
+    )
     return verdict.model_dump(mode="json")
 
 
@@ -88,10 +128,30 @@ async def edit_prose(
     file_path: str,
     voice: str | None = None,
     tolerance: Literal["strict", "normal", "relaxed"] = "normal",
+    audience: str | None = None,
+    severity_ceiling: int | None = None,
+    dial_ceiling: float | None = None,
+    surface: str | None = None,
 ) -> dict[str, object]:
     """Run the four-pass editor. Returns EditResult as JSON."""
-    deps = EditorDeps(file_path=Path(file_path), voice_name=voice, tolerance=tolerance)
-    result = await _craft().editor().run("Edit this prose.", deps=deps)
+    resolved: ResolvedAudience | None = None
+    if voice is not None:
+        resolved = resolve_audience(
+            voice,
+            cli_audience=audience,
+            cli_severity=severity_ceiling,
+            cli_dial=dial_ceiling,
+            cli_surface=surface,
+            front_matter_path=Path(file_path),
+            voices_root=None,
+        )
+    deps = EditorDeps(
+        file_path=Path(file_path),
+        voice_name=voice,
+        tolerance=tolerance,
+        audience=resolved,
+    )
+    result = await _craft().editor(audience=resolved).run("Edit this prose.", deps=deps)
     return result.output.model_dump(mode="json")
 
 
@@ -99,10 +159,29 @@ async def edit_prose(
 async def architect_prose(
     file_path: str,
     voice: str | None = None,
+    audience: str | None = None,
+    severity_ceiling: int | None = None,
+    dial_ceiling: float | None = None,
+    surface: str | None = None,
 ) -> dict[str, object]:
     """Opus-grade structural rewrite proposal. Returns ArchitectResult as JSON."""
-    deps = ArchitectDeps(file_path=Path(file_path), voice_name=voice)
-    result = await _craft().architect().run("Architect this prose.", deps=deps)
+    resolved: ResolvedAudience | None = None
+    if voice is not None:
+        resolved = resolve_audience(
+            voice,
+            cli_audience=audience,
+            cli_severity=severity_ceiling,
+            cli_dial=dial_ceiling,
+            cli_surface=surface,
+            front_matter_path=Path(file_path),
+            voices_root=None,
+        )
+    deps = ArchitectDeps(
+        file_path=Path(file_path),
+        voice_name=voice,
+        audience=resolved,
+    )
+    result = await _craft().architect(audience=resolved).run("Architect this prose.", deps=deps)
     return result.output.model_dump(mode="json")
 
 
@@ -110,10 +189,29 @@ async def architect_prose(
 async def tune_diction(
     file_path: str,
     voice: str | None = None,
+    audience: str | None = None,
+    severity_ceiling: int | None = None,
+    dial_ceiling: float | None = None,
+    surface: str | None = None,
 ) -> dict[str, object]:
     """Focused word-choice pass. Returns SubstitutionPlan as JSON."""
-    deps = TuneDeps(file_path=Path(file_path), voice_name=voice)
-    result = await _craft().tune_diction().run("Tune diction.", deps=deps)
+    resolved: ResolvedAudience | None = None
+    if voice is not None:
+        resolved = resolve_audience(
+            voice,
+            cli_audience=audience,
+            cli_severity=severity_ceiling,
+            cli_dial=dial_ceiling,
+            cli_surface=surface,
+            front_matter_path=Path(file_path),
+            voices_root=None,
+        )
+    deps = TuneDeps(
+        file_path=Path(file_path),
+        voice_name=voice,
+        audience=resolved,
+    )
+    result = await _craft().tune_diction(audience=resolved).run("Tune diction.", deps=deps)
     return result.output.model_dump(mode="json")
 
 
@@ -122,12 +220,35 @@ async def voice_compose_step(
     name: str,
     current_field: str = "purpose",
     profile: dict[str, object] | None = None,
+    audience: str | None = None,
+    severity_ceiling: int | None = None,
+    dial_ceiling: float | None = None,
+    surface: str | None = None,
 ) -> list[dict[str, object]]:
     """One step of the composer wizard. Returns list[VoiceDelta] as JSON."""
     from prose_craft.orchestrator.deps import ComposerDeps
 
-    deps = ComposerDeps(name=name, current_field=current_field, profile=profile)
-    result = await _craft().voice_composer().run("Compose step.", deps=deps)
+    try:
+        resolved = resolve_audience(
+            name,
+            cli_audience=audience,
+            cli_severity=severity_ceiling,
+            cli_dial=dial_ceiling,
+            cli_surface=surface,
+            front_matter_path=None,
+            voices_root=None,
+        )
+    except VoiceProfileNotFound:
+        if any(value is not None for value in (audience, severity_ceiling, dial_ceiling, surface)):
+            raise
+        resolved = None
+    deps = ComposerDeps(
+        name=name,
+        current_field=current_field,
+        profile=profile,
+        audience=resolved,
+    )
+    result = await _craft().voice_composer(audience=resolved).run("Compose step.", deps=deps)
     return [d.model_dump(mode="json") for d in result.output]
 
 
