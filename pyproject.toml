@@ -1,6 +1,6 @@
 [project]
 name = "prose-craft"
-version = "0.2.0"
+version = "0.2.1"
 description = "pydantic-ai engine for designing and applying prose voices"
 readme = "README.md"
 requires-python = ">=3.10"
