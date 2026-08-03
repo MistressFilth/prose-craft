@@ -287,3 +287,51 @@ def test_resolve_dial_out_of_range_raises(tmp_path):
         resolve_audience("test", cli_dial=1.5, voices_root=root)
     with pytest.raises(ValueError, match="dial"):
         resolve_audience("test", cli_dial=-0.1, voices_root=root)
+
+
+def test_resolve_merges_never_extend_additively(tmp_path):
+    root = tmp_path
+    audiences = AudiencesBlock(
+        external=AudienceCeiling(
+            severity_ceiling=4,
+            never_extend=[
+                "no internal codenames",
+                {"id": "no-all-caps", "rule": "no SHOUTING IN TITLES", "detection": "mechanical"},
+            ],
+        ),
+    )
+    _write_voice(root, "test", audiences)
+    result = resolve_audience("test", cli_audience="external", voices_root=root)
+    assert result is not None
+    rules = [n.rule for n in result.never]
+    assert "no internal codenames" in rules
+    assert "no SHOUTING IN TITLES" in rules
+
+
+def test_resolve_dedupes_voice_never_with_extend(tmp_path):
+    """Voice never + audience never_extend with same rule text: voice's entry (with its detection) wins."""
+    root = tmp_path
+    audiences = AudiencesBlock(
+        external=AudienceCeiling(
+            never_extend=["no em-dashes"],
+        ),
+    )
+    profile = VoiceProfile(
+        voice="test",
+        created=date(2026, 8, 1),
+        updated=date(2026, 8, 1),
+        register=RegisterAxes(),
+        diction=DictionConfig(),
+        rhythm=RhythmConfig(),
+        syntax=SyntaxConfig(),
+        lexicon=LexiconConfig(),
+        structure=StructureConfig(),
+        audiences=audiences,
+        never=[NeverEntry(rule="no em-dashes", detection="mechanical")],
+    )
+    write_voice(profile, root=root)
+    result = resolve_audience("test", cli_audience="external", voices_root=root)
+    assert result is not None
+    assert len(result.never) == 1
+    assert result.never[0].rule == "no em-dashes"
+    assert result.never[0].detection == "mechanical"

@@ -167,11 +167,36 @@ def resolve_audience(
             f"audience {name!r} is closed for voice {voice_name!r}: {ceiling.reason or '(no reason given)'}"
         )
 
+    # Never merge: voice.never + audiences.<name>.never_extend (extend semantics).
+    # Dedup by rule text; voice's entry wins on collision.
+    seen_rules: set[str] = set()
+    merged_never: list[NeverEntry] = []
+    for entry in profile.never:
+        # ``profile.never`` is typed ``list[NeverEntryOrStr]`` but the
+        # ``BeforeValidator`` on the alias coerces every bare string into
+        # a ``NeverEntry`` at parse time. Narrow for the type checker.
+        if isinstance(entry, str):
+            entry = NeverEntry(rule=entry)
+        if entry.rule not in seen_rules:
+            merged_never.append(entry)
+            seen_rules.add(entry.rule)
+    for ext in ceiling.never_extend:
+        if isinstance(ext, str):
+            rule = ext
+            detection = "agent-required"
+        else:
+            rule = ext.rule
+            detection = ext.detection
+        if rule not in seen_rules:
+            merged_never.append(NeverEntry(rule=rule, detection=detection))
+            seen_rules.add(rule)
+
     return ResolvedAudience(
         name=name,
         voice_name=voice_name,
         severity_ceiling=severity,
         dial_ceiling=dial,
+        never=merged_never,
         surface_filter=ceiling.surface_filter,
         surface_target=surface,
         closed=ceiling.closed,
