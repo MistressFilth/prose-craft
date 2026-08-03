@@ -8,7 +8,24 @@ imported_from: null
 voice_persona: null
 purpose: null
 audience: null
-audiences: {}
+audiences:
+  rationale: |
+    <why this voice has separate ceilings per audience>
+  private:
+    severity_ceiling: 5
+    dial_ceiling: 1.0
+    never_extend: []
+    surface_filter: null
+  team:
+    severity_ceiling: 5
+    dial_ceiling: 1.0
+    never_extend: []
+    surface_filter: null
+  external:
+    severity_ceiling: 4
+    dial_ceiling: 1.0
+    never_extend: []
+    surface_filter: null
 register:
   funny_serious: null
   formal_casual: null
