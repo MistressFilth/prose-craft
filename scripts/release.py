@@ -349,7 +349,7 @@ def _metadata_surfaces(
             lambda text: _set_runtime_version_text(text, version),
         ),
         (
-            "claude-code/plugin/prose-craft/.claude-plugin/plugin.json",
+            "claude-code/plugin/.claude-plugin/plugin.json",
             PLUGIN_JSON,
             lambda text: _set_json_version_text(text, version),
         ),
