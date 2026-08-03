@@ -21,7 +21,9 @@ def format_audience_block(audience: ResolvedAudience | None) -> str:
         return ""
     lines: list[str] = []
     lines.append(f"Audience: {audience.name}  (source: {audience.source})")
-    lines.append(f"Severity ceiling: {audience.severity_ceiling}/5    Dial ceiling: {audience.dial_ceiling:.2f}")
+    lines.append(
+        f"Severity ceiling: {audience.severity_ceiling}/5    Dial ceiling: {audience.dial_ceiling:.2f}"
+    )
     sf = audience.surface_filter
     if sf is not None:
         admitted = ", ".join(sf.admit) if sf.admit else "(none)"
@@ -29,7 +31,9 @@ def format_audience_block(audience: ResolvedAudience | None) -> str:
         lines.append(f"Surfaces admitted: {admitted}   Surfaces closed: {closed}")
     if audience.surface_target is not None:
         lines.append(f"Surface target: {audience.surface_target}")
-    lines.append(f"Never list (merged): {len(audience.never)} rules")
+    lines.append(
+        f"Never list (merged): {len(audience.never)} rule{'' if len(audience.never) == 1 else 's'}"
+    )
     if audience.warnings:
         lines.append("Warnings:")
         for w in audience.warnings:

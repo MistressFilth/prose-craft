@@ -40,6 +40,6 @@ def test_format_audience_block_with_warnings_and_surface():
     assert "Surfaces admitted: memo" in out
     assert "Surfaces closed: tweet" in out
     assert "Surface target: postmortem" in out
-    assert "Never list (merged): 1 rules" in out
+    assert "Never list (merged): 1 rule" in out
     assert "Warnings:" in out
     assert "audience 'external' is closed" in out
