@@ -5,6 +5,10 @@
 ### Added
 - Pre-PR checklist to `AGENTS.md`.
 - Release helper groups bullets by Conventional Commit type into `### Added` / `### Fixed` / `### Changed`.
+- `voice check` accepts `--audience`, `--severity`, `--dial`, and `--surface` flags; the resolved `ResolvedAudience` is fed into `check_voice()` and echoed in the verdict.
+
+### Changed
+- `check_voice()` accepts a `ResolvedAudience` and a `surface` string; the audience's severity ceiling tightens the statistical tolerance band, mechanical entries in `audience.never` are enforced, and a surface that lands in `audience.surface_filter.close` is flagged as a violation. `VoiceVerdict` gains an `audience` echo field plus a `violations` property that combines mechanical and statistical findings.
 
 ### Removed
 - `tests/unit/test_repository_metadata.py`; repository-metadata regression coverage is external to this project.

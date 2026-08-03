@@ -322,18 +322,69 @@ def voice_check(
     tolerance: Literal["strict", "normal", "relaxed"] = typer.Option("normal", "--tolerance"),
     as_json: bool = typer.Option(False, "--json"),
     voices_root: Path | None = typer.Option(None, "--voices-root"),
+    audience: str | None = typer.Option(
+        None, "--audience", help="Audience name (private/team/external/...)."
+    ),
+    severity: int | None = typer.Option(
+        None,
+        "--severity",
+        help="Severity ceiling 0-5 (overrides audience).",
+        min=0,
+        max=5,
+    ),
+    dial: float | None = typer.Option(
+        None,
+        "--dial",
+        help="Dial ceiling 0.0-1.0 (overrides audience).",
+        min=0.0,
+        max=1.0,
+    ),
+    surface: str | None = typer.Option(
+        None, "--surface", help="Target surface (e.g. memo/rfc/tweet)."
+    ),
 ) -> None:
     """Run the deterministic voice check on a file."""
+    from prose_craft.voices.audience import resolve_audience
     from prose_craft.voices.check import check_voice
 
     root = _voices_root_opt(voices_root)
     profile = read_voice(voice, root=root)
     text = file.read_text(encoding="utf-8")
-    verdict = check_voice(text, profile, tolerance=tolerance)
+    resolved = resolve_audience(
+        voice,
+        cli_audience=audience,
+        cli_severity=severity,
+        cli_dial=dial,
+        cli_surface=surface,
+        front_matter_path=file,
+        voices_root=root,
+    )
+    for w in resolved.warnings if resolved else []:
+        typer.echo(f"warning: {w}", err=True)
+    target_surface = surface
+    if target_surface is None and resolved is not None:
+        target_surface = resolved.surface_target
+    if target_surface is None:
+        ext = file.suffix.lstrip(".")
+        target_surface = ext or None
+    verdict = check_voice(
+        text,
+        profile,
+        tolerance=tolerance,
+        audience=resolved,
+        surface=target_surface,
+    )
     if as_json:
         typer.echo(verdict.model_dump_json(indent=2))
         return
     lines = [f"# Voice check — {voice}", ""]
+    if verdict.audience is not None:
+        a = verdict.audience
+        lines.append(
+            f"Audience: {a.name}  (source: {a.source}, "
+            f"severity ≤ {a.severity_ceiling}, dial ≤ {a.dial_ceiling})"
+        )
+        lines.append("")
     if verdict.mechanical:
         lines.append("## Mechanical")
         for v in verdict.mechanical:

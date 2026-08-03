@@ -147,3 +147,41 @@ def test_voice_draft_closed_audience_warns_but_proceeds(tmp_path: Path, monkeypa
         )
     assert result.exit_code == 0
     assert "closed" in (result.stderr or "")
+
+
+def test_voice_check_uses_audience(tmp_path: Path, monkeypatch) -> None:
+    voice_root = tmp_path / "voices"
+    _make_voice(
+        voice_root,
+        "test",
+        audiences=AudiencesBlock(
+            private=AudienceCeiling(severity_ceiling=5),
+            team=AudienceCeiling(severity_ceiling=3),
+        ),
+    )
+    target = tmp_path / "draft.md"
+    target.write_text("test prose", encoding="utf-8")
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(voice_root))
+    result = CliRunner().invoke(
+        app,
+        ["voice", "check", str(target), "--voice", "test", "--audience", "team"],
+    )
+    assert result.exit_code == 0, result.output
+
+
+def test_voice_check_invalid_audience_exits_2(tmp_path: Path, monkeypatch) -> None:
+    voice_root = tmp_path / "voices"
+    _make_voice(
+        voice_root,
+        "test",
+        audiences=AudiencesBlock(team=AudienceCeiling()),
+    )
+    target = tmp_path / "draft.md"
+    target.write_text("test prose", encoding="utf-8")
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(voice_root))
+    result = CliRunner().invoke(
+        app,
+        ["voice", "check", str(target), "--voice", "test", "--audience", "missing"],
+    )
+    assert result.exit_code == 2
+    assert "missing" in result.output
