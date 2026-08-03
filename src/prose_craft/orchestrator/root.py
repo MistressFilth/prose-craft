@@ -78,8 +78,8 @@ class ProseCraft:
 
     def _lazy(self, key: str, factory: Callable[[], T]) -> T:
         if key not in self._agents:
-            self._agents[key] = factory()  # type: ignore[assignment]
-        return self._agents[key]  # type: ignore[return-value]
+            self._agents[key] = factory()  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
+        return self._agents[key]  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
 
     def analyst(self) -> Agent[AnalysisDeps, ProseDiagnostic]:
         from prose_craft.agents.analyst import build_analyst

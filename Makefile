@@ -15,14 +15,14 @@ features-test:
 test: unit-test features-test
 
 clean:
-	rm -rf .ruff_cache .mypy_cache .pytest_cache src/prose_craft/__pycache__ src/prose_craft/*/__pycache__ tests/__pycache__ tests/*/__pycache__
+	rm -rf .ruff_cache .pytest_cache src/prose_craft/__pycache__ src/prose_craft/*/__pycache__ tests/__pycache__ tests/*/__pycache__
 	find . -type d -name __pycache__ -exec rm -rf {} +
 
 lint:
 	uv run ruff check src tests
 
 typecheck:
-	uv run mypy src/prose_craft
+	uv run ty check src/prose_craft
 
 format:
 	uv run ruff format src tests
