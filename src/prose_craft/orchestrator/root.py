@@ -33,6 +33,7 @@ from prose_craft.orchestrator.deps import (
     VoiceDeps,
 )
 from prose_craft.voices.check import VoiceVerdict
+from prose_craft.voices.audience import ResolvedAudience
 
 __all__ = ["ProseCraft"]
 
