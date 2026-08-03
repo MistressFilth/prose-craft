@@ -2,19 +2,25 @@
 
 ## [Unreleased]
 
+### Added
+- Pre-PR checklist to `AGENTS.md`.
+- Release helper groups bullets by Conventional Commit type into `### Added` / `### Fixed` / `### Changed`.
+
+### Fixed
+- Release helper no longer leaks `Co-authored-by:` footers, `---------` squash-merge separators, or `BREAKING CHANGE:` footers into changelog bullets.
+- Release helper classifies `fix:` commits under `### Fixed` instead of `### Changed`.
+
 ## [0.2.2] - 2026-08-03
 
 ### Fixed
-- `scripts/release.py`: close `mkstemp` file descriptor on failure to prevent leak.
-- `scripts/release.py`: drop unsupported `capture` keyword from `_run` calls.
-- `scripts/release.py`: `lstrip` each commit block to recover the subject on the first line.
-- `tests/unit/test_release.py`: drop vestigial plugin pyproject reference.
-- `scripts/release.py`: drop vestigial `claude-code/plugin/pyproject.toml` from metadata surfaces.
+- lstrip commit blocks to recover subject on first line.
+- Close mkstemp fd on failure to prevent leak.
+- Drop unsupported capture kwarg from `_run` calls.
 
 ## [0.2.1] - 2026-08-03
 
 ### Fixed
-- `scripts/release.py`: auto-commit metadata before tagging so the tag points to a commit whose surfaces agree with the version.
+- Drop vestigial plugin pyproject from metadata surfaces.
 
 ## [0.2.0] - 2026-08-03
 
