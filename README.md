@@ -68,10 +68,6 @@ pure Python, callable from CLI, agents (as tools), and MCP. Voice
 profiles are Pydantic models that round-trip the existing `voice.md`
 front-matter format.
 
-The design and implementation plan live in the project's
-notes directory (`@AGENTS.local.md`); see the spec and plan under
-`superpowers/` there.
-
 ## Development
 
 ```bash

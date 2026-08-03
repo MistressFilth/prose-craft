@@ -21,18 +21,5 @@ Treat any "pre-existing" issue — one already on `main`, in the issue tracker, 
 
 - `src/prose_craft/` — shipped engine.
 - `tests/` — unit and feature tests.
-- `claude-code/plugin/` — shipped Claude Code adapter.
+- `claude-code/plugin/` — shipped Claude Code plugin.
 - `.claude-plugin/marketplace.json` — development marketplace manifest.
-
-## Working memory
-
-Cross-repo scratch, brainstorm output, and any artifact **not yet promoted**
-to the engine docs lives in the project-notes hub:
-
-`@/home/divinefilth/code/project-notes/prose-craft/AGENTS.md`
-
-## Conventions
-
-See `@/home/divinefilth/.claude/rules/` for shared repo standards
-(commit format, required files, Makefile targets, pre-commit, versioning,
-changelog, plugin packaging).
