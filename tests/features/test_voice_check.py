@@ -29,7 +29,9 @@ def test_voice_check_json(monkeypatch, tmp_path: Path) -> None:
     _write_voice(tmp_path, "MistressFilth")
     draft = tmp_path / "p.md"
     draft.write_text("We will utilize this.", encoding="utf-8")
-    result = runner.invoke(app, ["voice", "check", str(draft), "--voice", "MistressFilth", "--json"])
+    result = runner.invoke(
+        app, ["voice", "check", str(draft), "--voice", "MistressFilth", "--json"]
+    )
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     assert "mechanical" in data

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from scripts import release
@@ -162,6 +164,22 @@ def test_metadata_surfaces_excludes_plugin_pyproject() -> None:
     """
     labels = [label for label, _path, _mutator in release._metadata_surfaces("9.9.9", ())]
     assert "claude-code/plugin/pyproject.toml" not in labels
+
+
+def test_metadata_surfaces_patch_bumps_marketplace_independently(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marketplace = tmp_path / "marketplace.json"
+    marketplace.write_text('{"version": "7.4.9"}\n', encoding="utf-8")
+    monkeypatch.setattr(release, "MARKETPLACE_JSON", marketplace)
+
+    surfaces = release._metadata_surfaces("9.9.9", ())
+    _label, _path, mutate = next(
+        item for item in surfaces if item[0] == ".claude-plugin/marketplace.json"
+    )
+    updated = mutate(marketplace.read_text(encoding="utf-8"))
+
+    assert json.loads(updated)["version"] == "7.4.10"
 
 
 def test_release_commit_message_format() -> None:

@@ -6,7 +6,12 @@
 - Pre-PR checklist to `AGENTS.md`.
 - Release helper groups bullets by Conventional Commit type into `### Added` / `### Fixed` / `### Changed`.
 
+### Changed
+- Marketplace development versioning now advances independently from engine and installed-plugin versions.
+
 ### Fixed
+- Restored direct-fetch bare-repository configuration and removed stale remote-tracking refs.
+- Removed prohibited co-author trailers from repository history and restored the formatting CI gate.
 - Release helper no longer leaks `Co-authored-by:` footers, `---------` squash-merge separators, or `BREAKING CHANGE:` footers into changelog bullets.
 - Release helper classifies `fix:` commits under `### Fixed` instead of `### Changed`.
 

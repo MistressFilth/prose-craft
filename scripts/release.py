@@ -135,6 +135,14 @@ def _read_root_version() -> str:
     return version
 
 
+def _read_json_version(path: Path) -> str:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    version = data.get("version")
+    if not isinstance(version, str) or not _SEMVER_RE.match(version):
+        raise RuntimeError(f"version {version!r} in {path} is not canonical X.Y.Z")
+    return version
+
+
 def _latest_tag() -> str | None:
     result = subprocess.run(
         ["git", "tag", "--list", "v*.*.*", "--sort=-v:refname"],
@@ -341,6 +349,7 @@ def _metadata_surfaces(
     version: str, subjects: Sequence[str]
 ) -> list[tuple[str, Path, Callable[[str], str]]]:
     today = _today_utc()
+    marketplace_version = next_version(_read_json_version(MARKETPLACE_JSON), "patch")
     return [
         ("pyproject.toml", PYPROJECT, lambda text: _set_pyproject_version_text(text, version)),
         (
@@ -356,7 +365,7 @@ def _metadata_surfaces(
         (
             ".claude-plugin/marketplace.json",
             MARKETPLACE_JSON,
-            lambda text: _set_json_version_text(text, version),
+            lambda text: _set_json_version_text(text, marketplace_version),
         ),
         (
             "CHANGELOG.md",
