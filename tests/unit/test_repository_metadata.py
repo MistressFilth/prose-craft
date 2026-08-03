@@ -37,7 +37,9 @@ def test_version_surfaces_match() -> None:
 
     runtime = (ROOT / "src/prose_craft/__init__.py").read_text(encoding="utf-8")
     plugin = json.loads(
-        (ROOT / "claude-code/plugin/.claude-plugin/plugin.json").read_text(encoding="utf-8")
+        (ROOT / "claude-code/plugin/prose-craft/.claude-plugin/plugin.json").read_text(
+            encoding="utf-8"
+        )
     )
     marketplace = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
 
@@ -45,7 +47,7 @@ def test_version_surfaces_match() -> None:
         f"src/prose_craft/__init__.py missing __version__ {version!r}"
     )
     assert plugin["version"] == version, (
-        f"claude-code/plugin/.claude-plugin/plugin.json version "
+        f"claude-code/plugin/prose-craft/.claude-plugin/plugin.json version "
         f"{plugin['version']!r} does not match canonical {version!r}"
     )
     assert marketplace["version"] == version, (
@@ -57,5 +59,5 @@ def test_version_surfaces_match() -> None:
 def test_marketplace_points_to_standard_plugin_layout() -> None:
     marketplace = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
 
-    assert marketplace["plugins"][0]["source"] == "./claude-code/plugin/"
+    assert marketplace["plugins"][0]["source"] == "./claude-code/plugin/prose-craft/"
     assert (ROOT / marketplace["plugins"][0]["source"][2:]).is_dir()

@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "prose-craft",
-      "source": "./claude-code/plugin/"
+      "source": "./claude-code/plugin/prose-craft/"
     }
   ]
 }

@@ -3,7 +3,7 @@
 ## [0.2.0] - 2026-08-03
 
 ### Changed
-- Standardize Claude Code plugin layout under `claude-code/plugin/`.
+- Standardize Claude Code plugin layout under `claude-code/plugin/prose-craft/`.
 - Align package, runtime, plugin, and marketplace version metadata at `0.2.0`.
 - Add repository quality gates and release workflow documentation.
 
