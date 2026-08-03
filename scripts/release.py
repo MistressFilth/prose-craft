@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -181,12 +182,13 @@ def _atomic_write(path: Path, content: str) -> None:
     """Write ``content`` to ``path`` via a sibling temp file + os.replace."""
     fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
     try:
-        with open(fd, "w", encoding="utf-8") as handle:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(content)
-        Path(tmp_name).replace(path)
     except Exception:
+        os.close(fd)
         Path(tmp_name).unlink(missing_ok=True)
         raise
+    Path(tmp_name).replace(path)
 
 
 def _set_pyproject_version_text(text: str, version: str) -> str:
