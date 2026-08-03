@@ -163,7 +163,7 @@ def _commits_since(tag: str | None) -> list[str]:
         capture_output=True,
         cwd=REPO_ROOT,
     )
-    return [block for block in result.stdout.split("\x00") if block.strip()]
+    return [block.lstrip() for block in result.stdout.split("\x00") if block.strip()]
 
 
 def _tag_exists_locally(tag: str) -> bool:
