@@ -7,7 +7,7 @@ import platform
 import re
 from pathlib import Path
 
-_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9-]*$")
 
 
 class VoiceNameError(ValueError):
@@ -41,10 +41,10 @@ def get_voices_root() -> Path:
 def voice_path(name: str, *, root: Path | None = None) -> Path:
     """Return ``<root>/<name>/voice.md`` for a valid voice name.
 
-    Voice names must match ``^[a-z0-9][a-z0-9-]*$``. Invalid names,
+    Voice names must match ``^[a-zA-Z][a-zA-Z0-9-]*$``. Invalid names,
     including path-traversal attempts, raise :class:`VoiceNameError`.
     """
     if _NAME_RE.fullmatch(name) is None:
-        raise VoiceNameError(f"invalid voice name {name!r}: must match [a-z0-9][a-z0-9-]*")
+        raise VoiceNameError(f"invalid voice name {name!r}: must match [a-zA-Z][a-zA-Z0-9-]*")
     base = (root or get_voices_root()) / name
     return base / "voice.md"
