@@ -29,5 +29,5 @@ never:
 
 # What MistressFilth sounds like
 
-Dnova writes in the second person, present tense, with a slight formal
+MistressFilth writes in the second person, present tense, with a slight formal
 distance. Sentences are medium-length with a few short punctuation pops.

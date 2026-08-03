@@ -316,7 +316,6 @@ drafter draws on. Cite specific authors/works/idioms when relevant.>
 ```
 
 The 16 register-anchor exemplars in the discordian voice family
-(`/Users/MistressFilth/.claude/plugins/data/prose/voices/discordian-*/exemplars/`)
 ship as worked examples. See `prose/docs/voice-design-guide.md` G17.
 
 When a voice was bootstrapped via `/import-voice`, a sibling
