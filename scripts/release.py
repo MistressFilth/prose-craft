@@ -20,7 +20,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 RUNTIME_INIT = REPO_ROOT / "src" / "prose_craft" / "__init__.py"
-PLUGIN_PYPROJECT = REPO_ROOT / "claude-code" / "plugin" / "pyproject.toml"
 PLUGIN_JSON = REPO_ROOT / "claude-code" / "plugin" / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = REPO_ROOT / ".claude-plugin" / "marketplace.json"
 CHANGELOG = REPO_ROOT / "CHANGELOG.md"
@@ -229,11 +228,6 @@ def _metadata_surfaces(
     today = _today_utc()
     return [
         ("pyproject.toml", PYPROJECT, lambda text: _set_pyproject_version_text(text, version)),
-        (
-            "claude-code/plugin/pyproject.toml",
-            PLUGIN_PYPROJECT,
-            lambda text: _set_pyproject_version_text(text, version),
-        ),
         (
             "src/prose_craft/__init__.py",
             RUNTIME_INIT,
