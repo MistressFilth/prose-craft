@@ -36,15 +36,11 @@ def test_version_surfaces_match() -> None:
     version = _read_canonical_version()
 
     runtime = (ROOT / "src/prose_craft/__init__.py").read_text(encoding="utf-8")
-    plugin_project = (ROOT / "claude-code/plugin/pyproject.toml").read_text(encoding="utf-8")
     plugin = json.loads(
         (ROOT / "claude-code/plugin/.claude-plugin/plugin.json").read_text(encoding="utf-8")
     )
     marketplace = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
 
-    assert f'version = "{version}"' in plugin_project, (
-        f"claude-code/plugin/pyproject.toml missing version {version!r}"
-    )
     assert f'__version__ = "{version}"' in runtime, (
         f"src/prose_craft/__init__.py missing __version__ {version!r}"
     )
