@@ -40,6 +40,41 @@ prose voice compose MistressFilth
 prose mcp
 ```
 
+## Audience-aware drafting
+
+Voice profiles can scope rules to an audience (`private`, `team`, `external`, or custom). Select the audience when drafting, editing, or checking:
+
+```bash
+# Pick the audience explicitly. Defaults to the voice's most-permissive one.
+prose voice draft discordian-base --audience external "..."
+
+# Tighten ceilings and pick a surface.
+prose voice draft discordian-base \
+    --audience external \
+    --severity 3 \
+    --dial 0.8 \
+    --surface postmortem \
+    --to /tmp/out.md \
+    "..."
+```
+
+Or put the audience in the target file's YAML front-matter:
+
+```markdown
+---
+audience: external
+severity_ceiling: 3
+dial_ceiling: 0.8
+surface: postmortem
+---
+
+# draft goes here
+```
+
+Precedence: CLI flag > front-matter > voice default. Closed audiences print a warning to stderr and proceed. Severity and dial flags replace audience ceilings verbatim — caller is responsible for not exceeding them.
+
+The FastMCP server tools (`analyze_prose`, `voice_check`, `edit_prose`, `architect_prose`, `tune_diction`, `voice_compose_step`) accept the same `audience` / `severity_ceiling` / `dial_ceiling` / `surface` parameters.
+
 ## Migrating from the old plugin
 
 If you have existing voices in `${CLAUDE_PLUGIN_DATA}/voices/`, copy

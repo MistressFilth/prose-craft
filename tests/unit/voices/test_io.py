@@ -139,6 +139,28 @@ def test_all_repo_voices_parse():
     assert len(parsed) >= 10, f"expected at least 10 voices, got {len(parsed)}: {parsed}"
 
 
+def test_all_shipped_voices_resolve_to_an_audience(tmp_path, monkeypatch):
+    """Every shipped voice parses AND resolves to a valid ResolvedAudience."""
+    from prose_craft.voices.audience import resolve_audience
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    voices_root = repo_root.parent / "voices"
+    assert voices_root.is_dir()
+    for voice_dir in sorted(voices_root.iterdir()):
+        if not voice_dir.is_dir():
+            continue
+        voice_md = voice_dir / "voice.md"
+        if not voice_md.is_file():
+            continue
+        # Each shipped voice has its own name; read it.
+        from prose_craft.voices.io import read_voice_raw
+        profile, _ = read_voice_raw(voice_dir.name, root=voices_root)
+        resolved = resolve_audience(profile.voice, voices_root=voices_root)
+        assert resolved is not None
+        assert resolved.name in profile.audiences.entries()
+        assert 0 <= resolved.severity_ceiling <= 5
+        assert 0.0 <= resolved.dial_ceiling <= 1.0
+
+
 def test_list_voices_falls_back_to_bundled(tmp_path, monkeypatch):
     """When the user root has no voices, bundled shipped voices appear.
 

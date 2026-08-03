@@ -8,6 +8,7 @@
 - `voice check` accepts `--audience`, `--severity`, `--dial`, and `--surface` flags; the resolved `ResolvedAudience` is fed into `check_voice()` and echoed in the verdict.
 
 ### Changed
+- Voice profiles' `audiences:` block is now honored by `voice draft`, `voice edit`, `voice check`, and the FastMCP server. New flags `--audience`, `--severity`, `--dial`, `--surface` apply on top of any front-matter `audience:` / `severity_ceiling:` / `dial_ceiling:` / `surface:` keys in the target file (precedence: CLI > front-matter > voice default). Default audience is the voice's most-permissive one. Closed audiences warn but allow. Severity and dial flags replace audience ceilings verbatim (caller responsibility). `voice check` tightens rule evaluation against the resolved audience's severity ceiling and merged `never_extend` list. `voice init` template now scaffolds an `audiences:` block.
 - `check_voice()` accepts a `ResolvedAudience` and a `surface` string; the audience's severity ceiling tightens the statistical tolerance band, mechanical entries in `audience.never` are enforced, and a surface that lands in `audience.surface_filter.close` is flagged as a violation. `VoiceVerdict` gains an `audience` echo field plus a `violations` property that combines mechanical and statistical findings.
 
 ### Removed
