@@ -32,7 +32,10 @@ def test_config_prints_model_and_voices_root(monkeypatch, tmp_path) -> None:
 
 
 def test_voice_list_empty(monkeypatch, tmp_path) -> None:
+    """An empty user root shows the bundled shipped voices (or "(no voices)" if not bundled)."""
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    # Disable bundled-voices fallback so the empty-user-root case stays empty.
+    monkeypatch.setattr("prose_craft.voices.io.get_bundled_voices_root", lambda: None)
     result = runner.invoke(app, ["voice", "list"])
     assert result.exit_code == 0
     assert "no voices" in result.stdout.lower() or result.stdout.strip() == ""

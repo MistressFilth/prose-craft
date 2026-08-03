@@ -146,7 +146,10 @@ async def test_mcp_lists_all_tools_and_resource_routes(mcp_client: Client) -> No
 async def test_mcp_list_voices_resource_empty(
     mcp_client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """An empty user root shows bundled shipped voices, or "(no voices)" when none are bundled."""
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    # Disable bundled-voices fallback so the empty-user-root case stays empty.
+    monkeypatch.setattr("prose_craft.voices.io.get_bundled_voices_root", lambda: None)
     async with mcp_client:
         result = await mcp_client.read_resource("prose://voices")
         assert "(no voices)" in _resource_text(result)

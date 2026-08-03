@@ -335,3 +335,80 @@ def test_resolve_dedupes_voice_never_with_extend(tmp_path):
     assert len(result.never) == 1
     assert result.never[0].rule == "no em-dashes"
     assert result.never[0].detection == "mechanical"
+
+
+def test_resolve_never_extend_string_entries_default_to_agent_required(tmp_path):
+    """Bare-string entries in ``audience.never_extend`` default to ``agent-required``.
+
+    The voice author may write the never list as bare strings (no dict);
+    the merge keeps the ``agent-required`` detection so the model is
+    the one judging the rule. Dicts with an explicit detection still
+    override the default.
+    """
+    root = tmp_path
+    audiences = AudiencesBlock(
+        external=AudienceCeiling(
+            severity_ceiling=4,
+            never_extend=[
+                "no internal codenames",
+                {"rule": "no SHOUTING IN TITLES", "detection": "mechanical"},
+            ],
+        ),
+    )
+    _write_voice(root, "test", audiences)
+    result = resolve_audience("test", cli_audience="external", voices_root=root)
+    assert result is not None
+    by_rule = {n.rule: n.detection for n in result.never}
+    assert by_rule["no internal codenames"] == "agent-required"
+    assert by_rule["no SHOUTING IN TITLES"] == "mechanical"
+
+
+def test_resolve_severity_boundary_zero_is_accepted(tmp_path):
+    """Severity ``0`` is on the closed end of the inclusive ``[0, 5]`` range."""
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=0))
+    _write_voice(root, "test", audiences)
+    result = resolve_audience("test", cli_audience="team", voices_root=root)
+    assert result is not None
+    assert result.severity_ceiling == 0
+
+
+def test_resolve_severity_boundary_five_is_accepted(tmp_path):
+    """Severity ``5`` is on the open end of the inclusive ``[0, 5]`` range."""
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling(severity_ceiling=5))
+    _write_voice(root, "test", audiences)
+    result = resolve_audience("test", cli_audience="team", voices_root=root)
+    assert result is not None
+    assert result.severity_ceiling == 5
+
+
+def test_resolve_dial_boundary_zero_is_accepted(tmp_path):
+    """Dial ``0.0`` is on the closed end of the inclusive ``[0.0, 1.0]`` range."""
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling(dial_ceiling=0.0))
+    _write_voice(root, "test", audiences)
+    result = resolve_audience("test", cli_audience="team", voices_root=root)
+    assert result is not None
+    assert result.dial_ceiling == 0.0
+
+
+def test_resolve_dial_boundary_one_is_accepted(tmp_path):
+    """Dial ``1.0`` is on the open end of the inclusive ``[0.0, 1.0]`` range."""
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling(dial_ceiling=1.0))
+    _write_voice(root, "test", audiences)
+    result = resolve_audience("test", cli_audience="team", voices_root=root)
+    assert result is not None
+    assert result.dial_ceiling == 1.0
+
+
+def test_resolve_front_matter_dial_ceiling_invalid_type_raises(tmp_path):
+    """A non-numeric ``dial_ceiling`` in front-matter raises ``ValueError``."""
+    root = tmp_path
+    audiences = AudiencesBlock(team=AudienceCeiling())
+    _write_voice(root, "test", audiences)
+    brief = tmp_path / "brief.md"
+    brief.write_text("---\ndial_ceiling: high\n---\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="dial_ceiling"):
+        resolve_audience("test", front_matter_path=brief, voices_root=root)
