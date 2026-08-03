@@ -326,11 +326,11 @@ def _commit_release(version: str, paths: Sequence[Path]) -> str:
     for path in paths:
         rel = path.relative_to(REPO_ROOT)
         _run(["git", "add", "--", str(rel)])
-    staged = _run(["git", "diff", "--cached", "--name-only"], capture=True).stdout.strip()
+    staged = _run(["git", "diff", "--cached", "--name-only"]).stdout.strip()
     if not staged:
         raise RuntimeError("no staged changes for release commit")
     _run(["git", "commit", "-m", _release_commit_message(version)])
-    return _run(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
+    return _run(["git", "rev-parse", "HEAD"]).stdout.strip()
 
 
 def _reset_release_commit() -> None:
