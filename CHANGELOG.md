@@ -24,4 +24,27 @@ Initial release as a Claude Code plugin only.
 ### Changed
 - fix(release): drop vestigial plugin pyproject from metadata surfaces
 
+## [0.2.2] - 2026-08-03
+
+### Changed
+- fix(release): drop unsupported capture kwarg from _run calls
+
+- fix(release): lstrip commit blocks to recover subject on first line
+
+- chore: align uv.lock with pyproject version
+
+- fix(release): close mkstemp fd on failure to prevent leak
+
+- fix(release): auto-commit metadata before tagging (#11)
+
+Co-authored-by: v0idbit <>
+- chore(release): 0.2.1 via guarded release helper (#10)
+
+* fix(release): drop vestigial plugin pyproject from metadata surfaces
+
+* chore(release): 0.2.1 via guarded release helper
+
+---------
+
+Co-authored-by: v0idbit <>
 
