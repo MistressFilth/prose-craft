@@ -124,7 +124,8 @@ def test_all_repo_voices_parse():
 
     repo_root = Path(__file__).resolve().parent.parent.parent.parent
     voices_root = repo_root.parent / "voices"
-    assert voices_root.is_dir(), f"missing voices root: {voices_root}"
+    if not voices_root.is_dir():
+        pytest.skip(f"shipped voices not present at {voices_root} (developer layout only)")
 
     parsed: list[str] = []
     for voice_dir in sorted(voices_root.iterdir()):
@@ -145,7 +146,8 @@ def test_all_shipped_voices_resolve_to_an_audience(tmp_path, monkeypatch):
 
     repo_root = Path(__file__).resolve().parent.parent.parent.parent
     voices_root = repo_root.parent / "voices"
-    assert voices_root.is_dir()
+    if not voices_root.is_dir():
+        pytest.skip(f"shipped voices not present at {voices_root} (developer layout only)")
     for voice_dir in sorted(voices_root.iterdir()):
         if not voice_dir.is_dir():
             continue
