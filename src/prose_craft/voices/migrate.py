@@ -15,16 +15,40 @@ from prose_craft.voices.location import (
 )
 
 
+# Order matters: the newer prose-voicecraft plugin renames the data
+# directory (``prose-voicecraft-prose-voicecraft``) so a user who has it
+# populated has a richer library than the bare ``prose/`` directory the
+# very first plugin used. Discovery walks newest → oldest.
+_LEGACY_PLUGIN_DATA_CANDIDATES: tuple[str, ...] = (
+    "prose-voicecraft-prose-voicecraft",
+    "prose",
+)
+
+
 def default_legacy_root() -> Path:
     """Return the legacy plugin-data location, if any.
 
-    Reads CLAUDE_PLUGIN_DATA env var; falls back to the prose plugin's
-    default. Always returns a Path (may not exist).
+    Resolution order:
+      1. ``CLAUDE_PLUGIN_DATA`` env var, if set, returns its ``voices/``
+         child unconditionally.
+      2. The first existing ``voices/`` directory under any of the known
+         legacy plugin-data names (``prose-voicecraft-prose-voicecraft``,
+         then ``prose``), so a user who has the newer prose-voicecraft
+         install populated finds their 17 voices rather than the empty
+         bare ``prose/`` stub.
+
+    Always returns a Path (may not exist on disk).
     """
     base = os.environ.get("CLAUDE_PLUGIN_DATA")
     if base:
         return Path(base) / "voices"
-    return Path.home() / ".claude" / "plugins" / "data" / "prose" / "voices"
+
+    plugins_data = Path.home() / ".claude" / "plugins" / "data"
+    for name in _LEGACY_PLUGIN_DATA_CANDIDATES:
+        candidate = plugins_data / name / "voices"
+        if candidate.is_dir():
+            return candidate
+    return plugins_data / _LEGACY_PLUGIN_DATA_CANDIDATES[-1] / "voices"
 
 
 class MigrationReport(BaseModel):

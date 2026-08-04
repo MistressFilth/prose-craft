@@ -31,9 +31,25 @@ class VoiceProfileNotFound(FileNotFoundError):
     """Raised when a voice profile does not exist on disk."""
 
 
+class VoiceParseError(ValueError):
+    """Raised when a voice file exists but its front-matter fails to parse.
+
+    Carries the offending file path and a one-line summary so callers
+    (``prose voice list``, MCP tools) can surface the problem to the
+    user instead of silently dropping the voice from the count.
+    """
+
+
 class VoiceSummary(BaseModel):
     name: str
     updated: date
+
+
+class VoiceError(BaseModel):
+    """One broken voice in a listing: the directory name + the parse error."""
+
+    name: str
+    error: str
 
 
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
@@ -197,4 +213,35 @@ def list_voices(*, root: Path | None = None) -> list[VoiceSummary]:
         bundled = get_bundled_voices_root()
         if bundled is not None and bundled != base:
             _scan(bundled)
+    return out
+
+
+def list_voice_errors(*, root: Path | None = None) -> list[VoiceError]:
+    """Enumerate voice directories whose front-matter fails to parse.
+
+    Walks the same roots ``list_voices`` scans (user root; falls back
+    to bundled when the user root is empty) and returns one
+    ``VoiceError`` per directory whose ``voice.md`` does not parse
+    against the current ``VoiceProfile`` schema. Bundled voices are not
+    re-scanned for errors — only the user root.
+
+    The function exists so callers (``prose voice list``,
+    ``prose_craft.mcp``) can surface breakage to the user instead of
+    silently undercounting the library.
+    """
+    base = root if root is not None else get_voices_root()
+    out: list[VoiceError] = []
+    if not base.exists():
+        return out
+    for child in sorted(base.iterdir()):
+        if not child.is_dir():
+            continue
+        candidate = child / "voice.md"
+        if not candidate.is_file():
+            continue
+        try:
+            _parse_voice_file(candidate)
+        except Exception as exc:
+            summary = f"{child.name}: {exc}".splitlines()[0]
+            out.append(VoiceError(name=child.name, error=summary))
     return out
