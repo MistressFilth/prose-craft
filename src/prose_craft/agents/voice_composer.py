@@ -11,12 +11,15 @@ from prose_craft.agents.base import make_sub_agent
 from prose_craft.agents.results import VoiceDelta
 from prose_craft.agents.tools import bind_composer_tools
 from prose_craft.orchestrator.deps import ComposerDeps
-from prose_craft.orchestrator.prompts import VOICE_COMPOSER_SYSTEM_PROMPT
+from prose_craft.orchestrator.prompts import VOICE_COMPOSER_SYSTEM_PROMPT, format_audience_block
+from prose_craft.voices.audience import ResolvedAudience
 
 
 def build_voice_composer(
     model: str,
     voices_root: Path,
+    *,
+    audience: ResolvedAudience | None = None,
 ) -> Agent[ComposerDeps, list[VoiceDelta]]:
     """Construct the voice-composer agent.
 
@@ -44,11 +47,12 @@ def build_voice_composer(
     capabilities = [Memory(namespace="prose-craft", store=FileStore(store_path))]
 
     tools = bind_composer_tools(root)
+    rendered = VOICE_COMPOSER_SYSTEM_PROMPT.format(audience_block=format_audience_block(audience))
 
     return make_sub_agent(
         model=model,
         output_type=list[VoiceDelta],
-        system_prompt=VOICE_COMPOSER_SYSTEM_PROMPT,
+        system_prompt=rendered,
         tools=[
             tools["load_voice"],
             tools["read_voice"],

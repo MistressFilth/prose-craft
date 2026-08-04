@@ -38,6 +38,28 @@ def get_voices_root() -> Path:
     return home / ".local" / "share" / "prose-craft" / "voices"
 
 
+def get_bundled_voices_root() -> Path | None:
+    """Return the read-only root for voices shipped with the wheel, or None.
+
+    Looks for the ``../voices`` directory at the repository root — the
+    bare-repo layout puts shipped voices one level up from each
+    worktree. Returns ``None`` when the directory does not exist (e.g.
+    in a packaged wheel install where the bundled voices were not
+    force-included, or in a non-repository environment).
+
+    Callers should treat a ``None`` return as "no shipped voices
+    available" and continue with the user root alone.
+    """
+    # ``src/prose_craft/voices/location.py`` → ``src/prose_craft/voices``
+    # → ``src/prose_craft`` → ``src`` → ``<repo_root>`` → ``<bare_root>`` → ``<bare_root>/voices``.
+    here = Path(__file__).resolve()
+    bare_root = here.parents[3].parent
+    bundled = bare_root / "voices"
+    if bundled.is_dir():
+        return bundled
+    return None
+
+
 def voice_path(name: str, *, root: Path | None = None) -> Path:
     """Return ``<root>/<name>/voice.md`` for a valid voice name.
 

@@ -33,6 +33,7 @@ from prose_craft.orchestrator.deps import (
     VoiceDeps,
 )
 from prose_craft.voices.check import VoiceVerdict
+from prose_craft.voices.audience import ResolvedAudience
 
 __all__ = ["ProseCraft"]
 
@@ -81,40 +82,62 @@ class ProseCraft:
             self._agents[key] = factory()  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
         return self._agents[key]  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
 
-    def analyst(self) -> Agent[AnalysisDeps, ProseDiagnostic]:
+    def analyst(
+        self, audience: ResolvedAudience | None = None
+    ) -> Agent[AnalysisDeps, ProseDiagnostic]:
         from prose_craft.agents.analyst import build_analyst
 
-        return self._lazy("analyst", lambda: build_analyst(self.model))
+        return self._lazy("analyst", lambda: build_analyst(self.model, audience=audience))
 
-    def editor(self) -> Agent[EditorDeps, EditResult]:
+    def editor(self, audience: ResolvedAudience | None = None) -> Agent[EditorDeps, EditResult]:
         from prose_craft.agents.editor import build_editor
 
-        return self._lazy("editor", lambda: build_editor(self.model))
+        return self._lazy("editor", lambda: build_editor(self.model, audience=audience))
 
-    def architect(self) -> Agent[ArchitectDeps, ArchitectResult]:
+    def architect(
+        self, audience: ResolvedAudience | None = None
+    ) -> Agent[ArchitectDeps, ArchitectResult]:
         from prose_craft.agents.architect import build_architect
 
-        return self._lazy("architect", lambda: build_architect(self.model))
+        return self._lazy("architect", lambda: build_architect(self.model, audience=audience))
 
-    def tune_diction(self) -> Agent[TuneDeps, SubstitutionPlan]:
+    def tune_diction(
+        self, audience: ResolvedAudience | None = None
+    ) -> Agent[TuneDeps, SubstitutionPlan]:
         from prose_craft.agents.tune_diction import build_tune_diction
 
-        return self._lazy("tune_diction", lambda: build_tune_diction(self.model))
+        return self._lazy("tune_diction", lambda: build_tune_diction(self.model, audience=audience))
 
-    def voice_checker(self) -> Agent[VoiceDeps, VoiceVerdict]:
+    def voice_checker(
+        self, audience: ResolvedAudience | None = None
+    ) -> Agent[VoiceDeps, VoiceVerdict]:
         from prose_craft.agents.voice_checker import build_voice_checker
 
-        return self._lazy("voice_checker", lambda: build_voice_checker(self.model))
+        return self._lazy(
+            "voice_checker",
+            lambda: build_voice_checker(
+                self.model, audience=audience, voices_root=self.voices_root
+            ),
+        )
 
-    def voice_stylist(self) -> Agent[StylistDeps, DraftResult]:
+    def voice_stylist(
+        self, audience: ResolvedAudience | None = None
+    ) -> Agent[StylistDeps, DraftResult]:
         from prose_craft.agents.voice_stylist import build_voice_stylist
 
-        return self._lazy("voice_stylist", lambda: build_voice_stylist(self.model))
+        return self._lazy(
+            "voice_stylist",
+            lambda: build_voice_stylist(
+                self.model, audience=audience, voices_root=self.voices_root
+            ),
+        )
 
-    def voice_composer(self) -> Agent[ComposerDeps, list[VoiceDelta]]:
+    def voice_composer(
+        self, audience: ResolvedAudience | None = None
+    ) -> Agent[ComposerDeps, list[VoiceDelta]]:
         from prose_craft.agents.voice_composer import build_voice_composer
 
         return self._lazy(
             "voice_composer",
-            lambda: build_voice_composer(self.model, self.voices_root),
+            lambda: build_voice_composer(self.model, self.voices_root, audience=audience),
         )

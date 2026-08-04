@@ -12,12 +12,14 @@ Three categories, matching the existing plugin taxonomy:
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel
 
 from prose_craft.analysis.sentences import tokenize_sentences, tokenize_words
-from prose_craft.voices.model import VoiceProfile
+from prose_craft.voices.audience import ResolvedAudience
+from prose_craft.voices.model import NeverEntry, VoiceProfile
 
 
 class Violation(BaseModel):
@@ -40,9 +42,16 @@ class VoiceVerdict(BaseModel):
     mechanical: list[Violation] = []
     statistical: list[Violation] = []
     judgments_needed: list[JudgmentNeeded] = []
+    audience: ResolvedAudience | None = None
+
+    @property
+    def violations(self) -> list[Violation]:
+        """All mechanical and statistical violations, concatenated."""
+        return [*self.mechanical, *self.statistical]
 
 
 _WORD_RE = re.compile(r"\b[A-Za-z][A-Za-z'-]*\b")
+_SHOUT_RE = re.compile(r"\b[A-Z]{2,}(?:\s+[A-Z]{2,})*\b")
 
 _TOLERANCE_BANDS: dict[str, float] = {
     "strict": 0.5,
@@ -110,36 +119,39 @@ def _check_preferred(text: str, profile: VoiceProfile) -> list[Violation]:
     return out
 
 
-def _check_pet_phrases(text: str, profile: VoiceProfile, tolerance: str) -> list[Violation]:
+def _check_pet_phrases(text: str, profile: VoiceProfile, band: float) -> list[Violation]:
     """Pet phrases recur by design. Flag over-saturation only.
 
-    Band: more than 3x per 1000 words is over-saturated, scaled by
-    tolerance (strict = 2x, normal = 3x, relaxed = 5x).
+    ``band`` is the effective tolerance band (looser → higher density
+    allowed). At the default tolerance of ``normal`` and no audience,
+    ``band`` is 1.0 — that maps to the legacy "3 per 1k words" cap.
+    A doubled band (2.0) doubles the cap; a halved band (0.5) halves it.
     """
     out: list[Violation] = []
     words = tokenize_words(text)
     if not words or not profile.lexicon.pet_phrases:
         return out
     text_lower = text.lower()
-    band = {"strict": 2, "normal": 3, "relaxed": 5}[tolerance]
+    # 3 per 1k words is the "normal" cap; scale linearly with the band.
+    density_cap = 3.0 * band
     for phrase in profile.lexicon.pet_phrases:
         count = text_lower.count(phrase.lower())
         density = count / len(words) * 1000
-        if density > band:
+        if density > density_cap:
             out.append(
                 Violation(
                     rule="lexicon.pet_phrases",
                     message=f"pet phrase {phrase!r} appears {count} times ({density:.1f}/1k)",
                     category="statistical",
                     measured=round(density, 1),
-                    target=f"<= {band}/1k",
-                    band=tolerance,
+                    target=f"<= {density_cap:.1f}/1k",
+                    band=f"±{band}",
                 )
             )
     return out
 
 
-def _check_sentence_length(text: str, profile: VoiceProfile, tolerance: str) -> list[Violation]:
+def _check_sentence_length(text: str, profile: VoiceProfile, band: float) -> list[Violation]:
     out: list[Violation] = []
     target = profile.rhythm.target_mean_sentence
     if not target:
@@ -153,7 +165,6 @@ def _check_sentence_length(text: str, profile: VoiceProfile, tolerance: str) -> 
         return out
     lengths = [len(tokenize_words(s)) for s in sents]
     mean = sum(lengths) / len(lengths)
-    band = _TOLERANCE_BANDS[tolerance]
     if mean < lo - band or mean > hi + band:
         out.append(
             Violation(
@@ -162,9 +173,90 @@ def _check_sentence_length(text: str, profile: VoiceProfile, tolerance: str) -> 
                 category="statistical",
                 measured=round(mean, 1),
                 target=target,
-                band=tolerance,
+                band=f"±{band}",
             )
         )
+    return out
+
+
+def _check_audience_never(text: str, audience: ResolvedAudience) -> list[Violation]:
+    """Enforce mechanical never-list entries carried by the resolved audience.
+
+    Audience-scoped never rules with ``detection="mechanical"`` are checked
+    alongside the voice's own mechanical checks. Today the only mechanical
+    pattern is "shouting" (an all-caps word/phrase); richer patterns can
+    extend this function without changing its signature.
+    """
+    out: list[Violation] = []
+    for entry in audience.never:
+        if entry.detection != "mechanical":
+            continue
+        if "shout" in entry.rule.lower():
+            for m in _SHOUT_RE.finditer(text):
+                line, col = _find_line_col(text, m.start())
+                out.append(
+                    Violation(
+                        line=line,
+                        col=col,
+                        rule=f"audience.never.{entry.rule}",
+                        message=f"shouting detected: {m.group()!r}",
+                        category="mechanical",
+                    )
+                )
+    return out
+
+
+def _check_surface_filter(
+    text: str, audience: ResolvedAudience, surface: str | None
+) -> list[Violation]:
+    """Flag the surface as a violation when it appears in audience.surface_filter.close.
+
+    Surfaces are simple string identifiers (e.g. "tweet", "memo", "rfc").
+    The caller resolves the surface — from the file's extension, the
+    ``--surface`` flag, or front-matter — and passes it in. A non-empty
+    ``audience.surface_filter.close`` is a hard veto: any matching surface
+    fails.
+    """
+    if surface is None or audience.surface_filter is None:
+        return []
+    close = audience.surface_filter.close or []
+    if not close or surface not in close:
+        return []
+    return [
+        Violation(
+            rule=f"audience.surface_filter.close.{surface}",
+            message=f"surface {surface!r} is closed for audience {audience.name!r}",
+            category="mechanical",
+        )
+    ]
+
+
+def _effective_band(tolerance: str, audience: ResolvedAudience | None) -> float:
+    """Return the tolerance band, tightened by the audience's severity ceiling.
+
+    Lower ceilings → tighter bands → more statistical violations fire.
+    The ceiling of 5 leaves the band unchanged; ceiling 0 collapses the
+    band to zero (every measurement at the boundary counts as a violation).
+    """
+    base = _TOLERANCE_BANDS[tolerance]
+    if audience is None:
+        return base
+    return base * (audience.severity_ceiling / 5)
+
+
+def _coerce_never_list(values: list[NeverEntry | str]) -> list[NeverEntry]:
+    """Coerce bare strings to ``NeverEntry`` (defaulting to ``agent-required``).
+
+    Mirrors the ``BeforeValidator`` on ``VoiceProfile.never`` so that callers
+    (and the type checker) can treat the result as a homogeneous list of
+    ``NeverEntry`` objects.
+    """
+    out: list[NeverEntry] = []
+    for v in values:
+        if isinstance(v, str):
+            out.append(NeverEntry(rule=v))
+        else:
+            out.append(v)
     return out
 
 
@@ -173,24 +265,49 @@ def check_voice(
     profile: VoiceProfile,
     *,
     tolerance: Literal["strict", "normal", "relaxed"] = "normal",
+    brief_path: Path | None = None,
+    audience: ResolvedAudience | None = None,
+    surface: str | None = None,
 ) -> VoiceVerdict:
-    """Run every check the profile enables and return a VoiceVerdict."""
+    """Run every check the profile enables and return a VoiceVerdict.
+
+    When ``audience`` is supplied, the resolved severity ceiling tightens
+    the tolerance band on statistical rules, mechanical entries from
+    ``audience.never`` are enforced alongside the voice's own mechanical
+    checks, and the target ``surface`` (when in
+    ``audience.surface_filter.close``) is flagged.
+    """
+    band = _effective_band(tolerance, audience)
     mechanical = (
         _check_banned(text, profile) + _check_taboo(text, profile) + _check_preferred(text, profile)
     )
-    statistical = _check_pet_phrases(text, profile, tolerance) + _check_sentence_length(
-        text, profile, tolerance
+    if audience is not None:
+        mechanical += _check_audience_never(text, audience)
+        mechanical += _check_surface_filter(text, audience, surface)
+    statistical = _check_pet_phrases(text, profile, band) + _check_sentence_length(
+        text, profile, band
     )
-    judgments = [
-        JudgmentNeeded(
-            rule=entry.rule,
-            prompt=f"Judge whether the draft violates: {entry.rule}",
-        )
-        for entry in profile.never
-        if entry.detection == "agent-required"
-    ]
+    seen: set[str] = set()
+    judgments: list[JudgmentNeeded] = []
+    sources: list[list[NeverEntry]] = [_coerce_never_list(profile.never)]
+    if audience is not None:
+        sources.append(audience.never)
+    for source in sources:
+        for entry in source:
+            if entry.detection != "agent-required":
+                continue
+            if entry.rule in seen:
+                continue
+            seen.add(entry.rule)
+            judgments.append(
+                JudgmentNeeded(
+                    rule=entry.rule,
+                    prompt=f"Judge whether the draft violates: {entry.rule}",
+                )
+            )
     return VoiceVerdict(
         mechanical=mechanical,
         statistical=statistical,
         judgments_needed=judgments,
+        audience=audience,
     )

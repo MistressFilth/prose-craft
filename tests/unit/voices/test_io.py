@@ -111,3 +111,128 @@ def test_list_voices(tmp_voices_root):
     summaries = list_voices(root=tmp_voices_root)
     names = {s.name for s in summaries}
     assert names == {"alpha", "beta"}
+
+
+def test_all_repo_voices_parse():
+    """Every shipped voice under ``../voices/`` parses against the model.
+
+    Catches schema drift between the pydantic ``VoiceProfile`` and the
+    on-disk YAML (e.g. ``audiences.rationale``, ``never`` as bare
+    strings, register axes with inline annotations).
+    """
+    from prose_craft.voices.io import _parse_voice_file
+
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    voices_root = repo_root.parent / "voices"
+    if not voices_root.is_dir():
+        pytest.skip(f"shipped voices not present at {voices_root} (developer layout only)")
+
+    parsed: list[str] = []
+    for voice_dir in sorted(voices_root.iterdir()):
+        if not voice_dir.is_dir():
+            continue
+        voice_md = voice_dir / "voice.md"
+        if not voice_md.is_file():
+            continue
+        profile = _parse_voice_file(voice_md)
+        parsed.append(profile.voice)
+
+    assert len(parsed) >= 10, f"expected at least 10 voices, got {len(parsed)}: {parsed}"
+
+
+def test_all_shipped_voices_resolve_to_an_audience(tmp_path, monkeypatch):
+    """Every shipped voice parses AND resolves to a valid ResolvedAudience."""
+    from prose_craft.voices.audience import resolve_audience
+
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    voices_root = repo_root.parent / "voices"
+    if not voices_root.is_dir():
+        pytest.skip(f"shipped voices not present at {voices_root} (developer layout only)")
+    for voice_dir in sorted(voices_root.iterdir()):
+        if not voice_dir.is_dir():
+            continue
+        voice_md = voice_dir / "voice.md"
+        if not voice_md.is_file():
+            continue
+        # Each shipped voice has its own name; read it.
+        from prose_craft.voices.io import read_voice_raw
+
+        profile, _ = read_voice_raw(voice_dir.name, root=voices_root)
+        resolved = resolve_audience(profile.voice, voices_root=voices_root)
+        assert resolved is not None
+        assert resolved.name in profile.audiences.entries()
+        assert 0 <= resolved.severity_ceiling <= 5
+        assert 0.0 <= resolved.dial_ceiling <= 1.0
+
+
+def test_list_voices_falls_back_to_bundled(tmp_path, monkeypatch):
+    """When the user root has no voices, bundled shipped voices appear.
+
+    Simulates a freshly installed tool with an empty XDG root: voices
+    shipped via the wheel (``prose_craft/_bundled_voices/``) must show
+    up in ``list_voices`` so ``prose voice list`` works out of the box.
+    """
+    from prose_craft.voices import io, location
+    from prose_craft.voices.location import get_bundled_voices_root
+
+    bundled = get_bundled_voices_root()
+    if bundled is None:
+        # Editable install / wheel built without force-include — skip.
+        pytest.skip("no bundled voices available in this environment")
+
+    # Force the user root to an empty dir so the fallback must fire.
+    monkeypatch.setattr(location, "get_voices_root", lambda: tmp_path)
+
+    summaries = io.list_voices()
+    names = {s.name for s in summaries}
+    assert names, "expected bundled voices when user root is empty"
+    # Bundled voices live under ``discordian-*`` in this repo.
+    assert any(n.startswith("discordian-") for n in names)
+
+
+def test_voice_init_template_includes_audiences_block():
+    from prose_craft.data import load_template
+
+    template = load_template()
+    assert "audiences:" in template
+    assert "private:" in template
+    assert "team:" in template
+    assert "external:" in template
+    assert "rationale:" in template
+    # Severity ceiling defaults to 5; external is 4
+    assert "severity_ceiling: 5" in template
+    assert "severity_ceiling: 4" in template
+
+
+def test_voice_init_scaffolds_audiences_block(tmp_path, monkeypatch):
+    """voice_init writes a voice.md with the scaffolded audiences block."""
+    from typer.testing import CliRunner
+    from prose_craft.cli import app
+
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    runner = CliRunner()
+    result = runner.invoke(app, ["voice", "init", "new-voice"])
+    assert result.exit_code == 0, result.output
+    voice_md = tmp_path / "new-voice" / "voice.md"
+    text = voice_md.read_text(encoding="utf-8")
+    assert "audiences:" in text
+    assert "private:" in text
+    assert "team:" in text
+    assert "external:" in text
+
+
+def test_resolve_voice_path_falls_back_to_bundled(tmp_path, monkeypatch):
+    """``_resolve_voice_path`` finds bundled voices when user root is empty."""
+    from prose_craft.voices import io, location
+    from prose_craft.voices.location import get_bundled_voices_root
+
+    bundled = get_bundled_voices_root()
+    if bundled is None:
+        pytest.skip("no bundled voices available in this environment")
+
+    monkeypatch.setattr(location, "get_voices_root", lambda: tmp_path)
+    bundled_voice = bundled / "discordian-base" / "voice.md"
+    assert bundled_voice.is_file()
+
+    resolved = io._resolve_voice_path("discordian-base", tmp_path)
+    assert resolved == bundled_voice

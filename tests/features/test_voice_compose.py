@@ -18,7 +18,7 @@ def test_voice_draft_writes_file(monkeypatch, tmp_path):
     (tmp_path / "MistressFilth").mkdir()
     (tmp_path / "MistressFilth" / "voice.md").write_text(
         "---\nvoice: MistressFilth\nversion: 1\ncreated: 2026-08-01\nupdated: 2026-08-01\n"
-        "register: {}\ndiction: {}\nrhythm: {}\nsyntax: {}\nlexicon: {}\nstructure: {}\n",
+        "register: {}\ndiction: {}\nrhythm: {}\nsyntax: {}\nlexicon: {}\nstructure: {}\n---\n",
         encoding="utf-8",
     )
 

@@ -17,7 +17,11 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from pydantic import BaseModel
 
-from prose_craft.voices.location import get_voices_root, voice_path
+from prose_craft.voices.location import (
+    get_bundled_voices_root,
+    get_voices_root,
+    voice_path,
+)
 
 if TYPE_CHECKING:
     from prose_craft.voices.model import VoiceProfile
@@ -39,22 +43,29 @@ def read_voice(name: str, *, root: Path | None = None) -> "VoiceProfile":
     """Parse <root>/<name>/voice.md and return a VoiceProfile.
 
     The prose body is dropped here (VoiceProfile has no body field);
-    callers that need the body can call ``read_voice_raw``.
+    callers that need the body can call ``read_voice_raw``. Falls back
+    to the bundled voices shipped with the wheel when the user root
+    has no copy of the voice.
     """
-    path = voice_path(name, root=root)
-    if not path.exists():
-        raise VoiceProfileNotFound(f"voice profile {name!r} not found at {path}")
+    path = _resolve_voice_path(name, root)
+    if path is None:
+        raise VoiceProfileNotFound(
+            f"voice profile {name!r} not found at {voice_path(name, root=root)}"
+        )
     return _parse_voice_file(path)
 
 
 def read_voice_file(name: str, *, root: Path | None = None) -> str:
     """Return the raw voice.md contents (front-matter + prose body).
 
-    Raises VoiceProfileNotFound if the file does not exist.
+    Raises VoiceProfileNotFound if the file does not exist. Falls back
+    to the bundled voices shipped with the wheel.
     """
-    path = voice_path(name, root=root)
-    if not path.exists():
-        raise VoiceProfileNotFound(f"voice profile {name!r} not found at {path}")
+    path = _resolve_voice_path(name, root)
+    if path is None:
+        raise VoiceProfileNotFound(
+            f"voice profile {name!r} not found at {voice_path(name, root=root)}"
+        )
     return path.read_text(encoding="utf-8")
 
 
@@ -62,11 +73,14 @@ def read_voice_raw(name: str, *, root: Path | None = None) -> tuple["VoiceProfil
     """Parse voice.md and return (profile, prose_body).
 
     The prose body is the text after the closing ``---`` marker,
-    without the trailing newline-strip the regex applies.
+    without the trailing newline-strip the regex applies. Falls back
+    to the bundled voices shipped with the wheel.
     """
-    path = voice_path(name, root=root)
-    if not path.exists():
-        raise VoiceProfileNotFound(f"voice profile {name!r} not found at {path}")
+    path = _resolve_voice_path(name, root)
+    if path is None:
+        raise VoiceProfileNotFound(
+            f"voice profile {name!r} not found at {voice_path(name, root=root)}"
+        )
     text = path.read_text(encoding="utf-8")
     match = _FRONTMATTER_RE.match(text)
     if not match:
@@ -78,6 +92,24 @@ def read_voice_raw(name: str, *, root: Path | None = None) -> tuple["VoiceProfil
 
     profile = VoiceProfile.model_validate(front_matter)
     return profile, body
+
+
+def _resolve_voice_path(name: str, root: Path | None) -> Path | None:
+    """Return the first existing ``<root>/<name>/voice.md`` or None.
+
+    Checks the user root first; if the file is missing there and a
+    bundled voices root is available, falls back to the bundled copy so
+    shipped voices are readable from a fresh install.
+    """
+    candidate = voice_path(name, root=root)
+    if candidate.is_file():
+        return candidate
+    bundled = get_bundled_voices_root()
+    if bundled is not None:
+        bundled_candidate = voice_path(name, root=bundled)
+        if bundled_candidate.is_file():
+            return bundled_candidate
+    return None
 
 
 def _parse_voice_file(path: Path) -> "VoiceProfile":
@@ -133,20 +165,36 @@ def list_voices(*, root: Path | None = None) -> list[VoiceSummary]:
 
     Returns voices sorted by name. Voices without parseable front-matter
     are skipped silently.
+
+    When the resolved user root (default or ``root=``) yields no
+    parseable voices, falls back to the bundled shipped voices so a
+    freshly installed tool can show defaults without manual setup. User
+    voices always take priority — bundled voices only appear when the
+    user root contributes nothing.
     """
-    base = root or get_voices_root()
-    if not base.exists():
-        return []
+    base = root if root is not None else get_voices_root()
+    seen: set[str] = set()
     out: list[VoiceSummary] = []
-    for child in sorted(base.iterdir()):
-        if not child.is_dir():
-            continue
-        candidate = child / "voice.md"
-        if not candidate.is_file():
-            continue
-        try:
-            profile = _parse_voice_file(candidate)
-        except Exception:
-            continue
-        out.append(VoiceSummary(name=profile.voice, updated=profile.updated))
+
+    def _scan(b: Path) -> None:
+        if not b.exists():
+            return
+        for child in sorted(b.iterdir()):
+            if not child.is_dir() or child.name in seen:
+                continue
+            candidate = child / "voice.md"
+            if not candidate.is_file():
+                continue
+            try:
+                profile = _parse_voice_file(candidate)
+            except Exception:
+                continue
+            seen.add(profile.voice)
+            out.append(VoiceSummary(name=profile.voice, updated=profile.updated))
+
+    _scan(base)
+    if not out:
+        bundled = get_bundled_voices_root()
+        if bundled is not None and bundled != base:
+            _scan(bundled)
     return out

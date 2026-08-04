@@ -367,3 +367,74 @@ def bind_composer_tools(voices_root: Path | str) -> dict[str, Any]:
         "list_voices": list_voices_bound,
         "apply_voice_delta": apply_voice_delta_bound,
     }
+
+
+def bind_voice_tools(voices_root: Path | str | None) -> dict[str, Any]:
+    """Return read-only voice tools bound to ``voices_root``.
+
+    ``voice_stylist`` and ``voice_checker`` need only the read side of
+    the voice-IO surface — ``load_voice``, ``read_voice``,
+    ``list_voices``, ``load_voice_diction``, ``run_voice_check_tool``.
+    Binding them to a configured root keeps the agents in sync with
+    ``--voices-root`` CLI overrides.
+
+    ``None`` is accepted and falls back to the raw (env-default) tools
+    so unit tests can pass ``None`` without monkeypatching IO. A non-
+    ``None`` root closes over the path and reaches the configured
+    store on every call.
+    """
+    if voices_root is None:
+        return {
+            "load_voice": load_voice,
+            "read_voice": read_voice,
+            "list_voices": list_voices,
+            "load_voice_diction": load_voice_diction,
+            "run_voice_check_tool": run_voice_check_tool,
+        }
+    root = _coerce_root(voices_root)
+
+    def load_voice_bound(ctx: RunContext[Any], voice_name: str) -> str:
+        profile = _io_read_voice(voice_name, root=root)
+        if profile.voice != voice_name:
+            raise ValueError(
+                f"profile.voice={profile.voice!r} does not match voice_name={voice_name!r}"
+            )
+        return profile.model_dump_json()
+
+    def read_voice_bound(ctx: RunContext[Any], voice_name: str) -> str:
+        _profile, body = read_voice_raw(voice_name, root=root)
+        return body
+
+    def list_voices_bound(ctx: RunContext[Any]) -> str:
+        summaries = _io_list_voices(root=root)
+        if not summaries:
+            return "[]"
+        return "[" + ",".join(s.model_dump_json() for s in summaries) + "]"
+
+    def load_voice_diction_bound(ctx: RunContext[Any], voice_name: str) -> str:
+        profile = _io_read_voice(voice_name, root=root)
+        diction = DictionConfig.model_validate(profile.diction.model_dump())
+        return diction.model_dump_json()
+
+    def run_voice_check_tool_bound(
+        ctx: RunContext[Any],
+        text: str,
+        voice_name: str,
+    ) -> str:
+        profile = _io_read_voice(voice_name, root=root)
+        verdict = check_voice(text, profile)
+        return verdict.model_dump_json()
+
+    load_voice_bound.__name__ = "load_voice"
+    read_voice_bound.__name__ = "read_voice"
+    list_voices_bound.__name__ = "list_voices"
+    load_voice_diction_bound.__name__ = "load_voice_diction"
+    run_voice_check_tool_bound.__name__ = "run_voice_check_tool"
+
+    return {
+        "load_voice": load_voice_bound,
+        "read_voice": read_voice_bound,
+        "list_voices": list_voices_bound,
+        "load_voice_diction": load_voice_diction_bound,
+        "run_voice_check_tool": run_voice_check_tool_bound,
+    }
