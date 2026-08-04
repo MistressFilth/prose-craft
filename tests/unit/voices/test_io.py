@@ -113,6 +113,37 @@ def test_list_voices(tmp_voices_root):
     assert names == {"alpha", "beta"}
 
 
+def test_list_voices_reports_broken_files(tmp_voices_root):
+    """A voice file that fails to parse must surface as an error, not be
+    silently dropped from the list. Otherwise a half-broken library
+    (e.g. one voice from a previous schema) makes the count look
+    wrong with no explanation.
+    """
+    from prose_craft.voices.io import list_voice_errors
+
+    (tmp_voices_root / "good").mkdir()
+    (tmp_voices_root / "good" / "voice.md").write_text(
+        "---\nvoice: good\nversion: 1\ncreated: 2026-08-01\nupdated: 2026-08-01\n"
+        "register: {}\ndiction: {}\nrhythm: {}\nsyntax: {}\nlexicon: {}\nstructure: {}\n---\n",
+        encoding="utf-8",
+    )
+    (tmp_voices_root / "bad").mkdir()
+    (tmp_voices_root / "bad" / "voice.md").write_text(
+        "---\nvoice: bad\nregister_discipline: {survives_old_schema: yes}\n---\n",
+        encoding="utf-8",
+    )
+
+    errors = list_voice_errors(root=tmp_voices_root)
+    assert len(errors) == 1
+    assert errors[0].name == "bad"
+    assert isinstance(errors[0].error, str)
+    assert errors[0].error  # non-empty message
+
+    # Healthy voice still lists; broken one is reported, not silent.
+    summaries = list_voices(root=tmp_voices_root)
+    assert {s.name for s in summaries} == {"good"}
+
+
 def test_all_repo_voices_parse():
     """Every shipped voice under ``../voices/`` parses against the model.
 

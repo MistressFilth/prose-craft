@@ -138,13 +138,18 @@ def voice_list(
     voices_root: Path | None = typer.Option(None, "--voices-root"),
 ) -> None:
     """List every voice under the active root."""
+    from prose_craft.voices.io import list_voice_errors
+
     root = _voices_root_opt(voices_root)
     summaries = list_voices(root=root)
     if not summaries:
         typer.echo("(no voices found)")
-        return
-    for s in summaries:
-        typer.echo(f"{s.name}  ({s.updated.isoformat()})")
+    else:
+        for s in summaries:
+            typer.echo(f"{s.name}  ({s.updated.isoformat()})")
+    errors = list_voice_errors(root=root)
+    for e in errors:
+        typer.echo(f"error: {e.name}: {e.error}", err=True)
 
 
 @voice_app.command("show")

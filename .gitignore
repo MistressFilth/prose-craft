@@ -14,3 +14,4 @@ docs/superpowers/
 # Harness artifacts
 AGENTS.local.md
 .claude/settings.local.json
+.coverage
