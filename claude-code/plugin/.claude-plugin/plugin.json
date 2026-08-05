@@ -1,6 +1,6 @@
 {
   "name": "prose-craft",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Thin Claude Code adapter over the prose-craft engine. The engine itself is a pydantic-ai CLI + FastMCP server in this same repo.",
   "author": {
     "name": "MistressFilth"
