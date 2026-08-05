@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
-from prose_craft.config import DEFAULT_MODEL, get_model, get_voices_root
+from prose_craft.config import DEFAULT_MODEL, get_model
 
 
 def test_get_model_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -20,11 +18,8 @@ def test_get_model_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     assert get_model() == "anthropic:claude-sonnet-4-5"
 
 
-def test_get_voices_root_matches_voices_location(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    from prose_craft.voices.location import get_voices_root as voices_root
+def test_get_voices_root_re_export_is_gone() -> None:
+    """Callers import voices_root from prose_craft.paths now."""
+    from prose_craft import config
 
-    monkeypatch.delenv("PROSE_CRAFT_VOICES_ROOT", raising=False)
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
-    assert get_voices_root() == voices_root()
+    assert not hasattr(config, "get_voices_root")

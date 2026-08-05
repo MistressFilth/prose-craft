@@ -39,7 +39,8 @@ from rich.markdown import Markdown
 
 from prose_craft import __version__
 from prose_craft.agents.results import VoiceDelta
-from prose_craft.config import get_model, get_voices_root
+from prose_craft.config import get_model
+from prose_craft.paths import voices_root as _default_voices_root
 from prose_craft.orchestrator.root import ProseCraft
 from prose_craft.voices.audience import AudienceNotFoundError
 from prose_craft.voices.io import (
@@ -103,7 +104,7 @@ def _voices_root_opt(root: Path | None) -> Path:
     """Return the active voices root, honoring a CLI override."""
     if root is not None:
         return root.resolve()
-    return get_voices_root()
+    return _default_voices_root()
 
 
 @app.command()
@@ -129,7 +130,7 @@ def config(
     if voices_root:
         os.environ["PROSE_CRAFT_VOICES_ROOT"] = str(voices_root)
     typer.echo(f"model: {get_model()}")
-    typer.echo(f"voices_root: {get_voices_root()}")
+    typer.echo(f"voices_root: {_default_voices_root()}")
 
 
 @voice_app.command("list")

@@ -17,13 +17,21 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from pydantic import BaseModel
 
-from prose_craft.voices.location import (
-    get_voices_root,
-    voice_path,
-)
+from prose_craft.voices.location import voice_path
 
 if TYPE_CHECKING:
     from prose_craft.voices.model import VoiceProfile
+
+
+def _default_root() -> Path:
+    """The active voices root.
+
+    Deferred import: ``prose_craft.paths`` reaches back into this
+    package, so a module-level import would cycle.
+    """
+    from prose_craft.paths import voices_root
+
+    return voices_root()
 
 
 class VoiceProfileNotFound(FileNotFoundError):
@@ -170,7 +178,7 @@ def list_voices(*, root: Path | None = None) -> list[VoiceSummary]:
     are skipped silently. No bundled fallback: an empty or missing root
     yields ``[]``.
     """
-    base = root if root is not None else get_voices_root()
+    base = root if root is not None else _default_root()
     seen: set[str] = set()
     out: list[VoiceSummary] = []
 
@@ -205,7 +213,7 @@ def list_voice_errors(*, root: Path | None = None) -> list[VoiceError]:
     ``prose_craft.mcp``) can surface breakage to the user instead of
     silently undercounting the library.
     """
-    base = root if root is not None else get_voices_root()
+    base = root if root is not None else _default_root()
     out: list[VoiceError] = []
     if not base.exists():
         return out
