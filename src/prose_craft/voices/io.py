@@ -18,7 +18,6 @@ import yaml
 from pydantic import BaseModel
 
 from prose_craft.voices.location import (
-    get_bundled_voices_root,
     get_voices_root,
     voice_path,
 )
@@ -59,9 +58,7 @@ def read_voice(name: str, *, root: Path | None = None) -> "VoiceProfile":
     """Parse <root>/<name>/voice.md and return a VoiceProfile.
 
     The prose body is dropped here (VoiceProfile has no body field);
-    callers that need the body can call ``read_voice_raw``. Falls back
-    to the bundled voices shipped with the wheel when the user root
-    has no copy of the voice.
+    callers that need the body can call ``read_voice_raw``.
     """
     path = _resolve_voice_path(name, root)
     if path is None:
@@ -74,8 +71,7 @@ def read_voice(name: str, *, root: Path | None = None) -> "VoiceProfile":
 def read_voice_file(name: str, *, root: Path | None = None) -> str:
     """Return the raw voice.md contents (front-matter + prose body).
 
-    Raises VoiceProfileNotFound if the file does not exist. Falls back
-    to the bundled voices shipped with the wheel.
+    Raises VoiceProfileNotFound if the file does not exist.
     """
     path = _resolve_voice_path(name, root)
     if path is None:
@@ -89,8 +85,7 @@ def read_voice_raw(name: str, *, root: Path | None = None) -> tuple["VoiceProfil
     """Parse voice.md and return (profile, prose_body).
 
     The prose body is the text after the closing ``---`` marker,
-    without the trailing newline-strip the regex applies. Falls back
-    to the bundled voices shipped with the wheel.
+    without the trailing newline-strip the regex applies.
     """
     path = _resolve_voice_path(name, root)
     if path is None:
@@ -111,21 +106,13 @@ def read_voice_raw(name: str, *, root: Path | None = None) -> tuple["VoiceProfil
 
 
 def _resolve_voice_path(name: str, root: Path | None) -> Path | None:
-    """Return the first existing ``<root>/<name>/voice.md`` or None.
+    """Return ``<root>/<name>/voice.md`` if it exists, else ``None``.
 
-    Checks the user root first; if the file is missing there and a
-    bundled voices root is available, falls back to the bundled copy so
-    shipped voices are readable from a fresh install.
+    Resolution is single-root: there is no bundled fallback. Voices
+    must live at the user root (or the explicit ``root=`` argument).
     """
     candidate = voice_path(name, root=root)
-    if candidate.is_file():
-        return candidate
-    bundled = get_bundled_voices_root()
-    if bundled is not None:
-        bundled_candidate = voice_path(name, root=bundled)
-        if bundled_candidate.is_file():
-            return bundled_candidate
-    return None
+    return candidate if candidate.is_file() else None
 
 
 def _parse_voice_file(path: Path) -> "VoiceProfile":
@@ -177,16 +164,11 @@ def write_voice(
 
 
 def list_voices(*, root: Path | None = None) -> list[VoiceSummary]:
-    """Enumerate every voice under the root.
+    """Enumerate every voice under the user root.
 
     Returns voices sorted by name. Voices without parseable front-matter
-    are skipped silently.
-
-    When the resolved user root (default or ``root=``) yields no
-    parseable voices, falls back to the bundled shipped voices so a
-    freshly installed tool can show defaults without manual setup. User
-    voices always take priority — bundled voices only appear when the
-    user root contributes nothing.
+    are skipped silently. No bundled fallback: an empty or missing root
+    yields ``[]``.
     """
     base = root if root is not None else get_voices_root()
     seen: set[str] = set()
@@ -209,21 +191,15 @@ def list_voices(*, root: Path | None = None) -> list[VoiceSummary]:
             out.append(VoiceSummary(name=profile.voice, updated=profile.updated))
 
     _scan(base)
-    if not out:
-        bundled = get_bundled_voices_root()
-        if bundled is not None and bundled != base:
-            _scan(bundled)
     return out
 
 
 def list_voice_errors(*, root: Path | None = None) -> list[VoiceError]:
     """Enumerate voice directories whose front-matter fails to parse.
 
-    Walks the same roots ``list_voices`` scans (user root; falls back
-    to bundled when the user root is empty) and returns one
-    ``VoiceError`` per directory whose ``voice.md`` does not parse
-    against the current ``VoiceProfile`` schema. Bundled voices are not
-    re-scanned for errors — only the user root.
+    Scans the user root only and returns one ``VoiceError`` per directory
+    whose ``voice.md`` does not parse against the current ``VoiceProfile``
+    schema.
 
     The function exists so callers (``prose voice list``,
     ``prose_craft.mcp``) can surface breakage to the user instead of

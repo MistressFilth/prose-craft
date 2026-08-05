@@ -178,10 +178,10 @@ def test_voice_init_scaffolds_audiences_block(tmp_path, monkeypatch):
 def test_read_voice_missing_raises(tmp_path, monkeypatch):
     """read_voice / read_voice_file / read_voice_raw raise VoiceProfileNotFound
     when the name is absent from the user root. No bundled fallback."""
-    from prose_craft.voices import io, location
+    from prose_craft.voices import io
     from prose_craft.voices.io import VoiceProfileNotFound
 
-    monkeypatch.setattr(location, "get_voices_root", lambda: tmp_path)
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
 
     with pytest.raises(VoiceProfileNotFound):
         io.read_voice("does-not-exist")
