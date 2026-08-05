@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  check:
+  matrix-check:
     strategy:
       fail-fast: false
       matrix:
@@ -28,3 +28,19 @@ jobs:
       - run: make init
       - run: make check
       - run: make test
+
+  # The aggregating gate. Branch protection requires a status context
+  # named exactly "check"; a matrix job reports as "check (<os>)" and
+  # would never satisfy it. Keeping the required context on a separate
+  # single job means the platform list can change without touching
+  # branch protection.
+  check:
+    needs: matrix-check
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify every platform succeeded
+        run: |
+          result='${{ needs.matrix-check.result }}'
+          echo "matrix-check result: $result"
+          test "$result" = "success"
