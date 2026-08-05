@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from functools import wraps
 from pathlib import Path
+import os
 import sys
 import traceback
 from typing import Any, Literal
@@ -39,7 +40,8 @@ from rich.markdown import Markdown
 
 from prose_craft import __version__
 from prose_craft.agents.results import VoiceDelta
-from prose_craft.config import get_model, get_voices_root
+from prose_craft.config import get_model
+from prose_craft.paths import voices_root as _default_voices_root
 from prose_craft.orchestrator.root import ProseCraft
 from prose_craft.voices.audience import AudienceNotFoundError
 from prose_craft.voices.io import (
@@ -103,7 +105,7 @@ def _voices_root_opt(root: Path | None) -> Path:
     """Return the active voices root, honoring a CLI override."""
     if root is not None:
         return root.resolve()
-    return get_voices_root()
+    return _default_voices_root()
 
 
 @app.command()
@@ -122,14 +124,8 @@ def config(
     ),
 ) -> None:
     """Print the active model and voices root."""
-    import os
-
-    if model:
-        os.environ["PROSE_CRAFT_MODEL"] = model
-    if voices_root:
-        os.environ["PROSE_CRAFT_VOICES_ROOT"] = str(voices_root)
-    typer.echo(f"model: {get_model()}")
-    typer.echo(f"voices_root: {get_voices_root()}")
+    typer.echo(f"model: {model or get_model()}")
+    typer.echo(f"voices_root: {_voices_root_opt(voices_root)}")
 
 
 @voice_app.command("list")
@@ -610,46 +606,53 @@ def voice_draft(
     import tempfile
 
     from prose_craft.orchestrator.deps import StylistDeps
+    from prose_craft.paths import scratch_dir
     from prose_craft.voices.audience import resolve_audience
 
     root = _voices_root_opt(voices_root)  # honor the override for env consistency
     # The stylist reads/writes the target file. The CLI seeds an empty
-    # file at --to if given; the agent writes into it.
+    # file at --to if given; the agent writes into it. Without --to we
+    # use a scratch file under the runtime dir and remove it after.
+    scratch: Path | None = None
     if to is not None:
         to.parent.mkdir(parents=True, exist_ok=True)
         to.touch()
         file_path = to
     else:
-        # Use a tmp path; the agent's text is printed to stdout.
-        with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as tmp:
-            file_path = Path(tmp.name)
-            file_path.write_text("", encoding="utf-8")
+        fd, tmp_name = tempfile.mkstemp(suffix=".md", dir=scratch_dir())
+        os.close(fd)
+        scratch = Path(tmp_name)
+        file_path = scratch
 
-    resolved = resolve_audience(
-        name,
-        cli_audience=audience,
-        cli_severity=severity,
-        cli_dial=dial,
-        cli_surface=surface,
-        front_matter_path=file_path,
-        voices_root=root,
-    )
-    for w in resolved.warnings if resolved else []:
-        typer.echo(f"warning: {w}", err=True)
+    try:
+        resolved = resolve_audience(
+            name,
+            cli_audience=audience,
+            cli_severity=severity,
+            cli_dial=dial,
+            cli_surface=surface,
+            front_matter_path=file_path,
+            voices_root=root,
+        )
+        for w in resolved.warnings if resolved else []:
+            typer.echo(f"warning: {w}", err=True)
 
-    craft = ProseCraft(voices_root=root)
-    result = craft.voice_stylist(audience=resolved).run_sync(
-        f"Draft prose in voice {name!r}. Brief: {brief}",
-        deps=StylistDeps(
-            file_path=file_path,
-            voice_name=name,
-            brief=brief,
-            mode="draft",
-            audience=resolved,
-        ),
-    )
-    if to is None:
-        typer.echo(result.output.text)
+        craft = ProseCraft(voices_root=root)
+        result = craft.voice_stylist(audience=resolved).run_sync(
+            f"Draft prose in voice {name!r}. Brief: {brief}",
+            deps=StylistDeps(
+                file_path=file_path,
+                voice_name=name,
+                brief=brief,
+                mode="draft",
+                audience=resolved,
+            ),
+        )
+        if to is None:
+            typer.echo(result.output.text)
+    finally:
+        if scratch is not None:
+            scratch.unlink(missing_ok=True)
 
 
 @voice_app.command("edit")

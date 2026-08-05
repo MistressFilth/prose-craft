@@ -1,3 +1,3 @@
 """prose-craft: pydantic-ai engine for designing and applying prose voices."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

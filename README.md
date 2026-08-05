@@ -9,7 +9,8 @@ A `pydantic-ai` engine for designing and applying prose voices.
   show/init, migrate, mcp.
 - **FastMCP server** (`prose mcp`) over stdio, exposing the engine as
   tools and resources to any MCP host.
-- **Voice profiles** at `$XDG_DATA_HOME/prose-craft/voices/<name>/voice.md`.
+- **Voice profiles** at the platform voices root (`prose config` resolves it).
+- **Linux, macOS, and Windows**, each tested in CI.
 - **Claude Code plugin** at `claude-code/plugin/` is a thin adapter over the engine.
 
 ## Install
@@ -75,6 +76,36 @@ Precedence: CLI flag > front-matter > voice default. Closed audiences print a wa
 
 The FastMCP server tools (`analyze_prose`, `voice_check`, `edit_prose`, `architect_prose`, `tune_diction`, `voice_compose_step`) accept the same `audience` / `severity_ceiling` / `dial_ceiling` / `surface` parameters.
 
+## Configuration
+
+Prose-craft honors the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/) on every platform, and falls back to each platform's native convention when the XDG variables are unset.
+
+| | Linux | macOS | Windows |
+|---|---|---|---|
+| Voices | `~/.local/share/prose-craft/voices/` | `~/Library/Application Support/prose-craft/voices/` | `%LOCALAPPDATA%\prose-craft\voices\` |
+| Composer state | `~/.local/state/prose-craft/composer-state/` | `~/Library/Application Support/prose-craft/composer-state/` | `%LOCALAPPDATA%\prose-craft\composer-state\` |
+| Draft scratch | `$XDG_RUNTIME_DIR/prose-craft/scratch/` | `~/Library/Caches/TemporaryItems/prose-craft/scratch/` | `%LOCALAPPDATA%\Temp\prose-craft\scratch\` |
+
+Run `prose config` to print the resolved voices root on your machine.
+
+Each root resolves through `PROSE_CRAFT_XDG_<NAME>`, then `XDG_<NAME>`, then the
+native default. The XDG variables work on macOS and Windows too:
+
+```bash
+XDG_DATA_HOME=/mnt/voices prose voice list
+```
+
+A value that is empty or relative is ignored, per the specification.
+
+`PROSE_CRAFT_VOICES_ROOT` names the voices directory outright and wins over all
+of the above; `--voices-root` is its per-invocation equivalent.
+
+`PROSE_CRAFT_MODEL` selects the model (default `anthropic:claude-opus-4-5`).
+
+If `XDG_RUNTIME_DIR` is exported but unusable — common under WSL, in containers,
+and in ssh sessions without a login session — scratch files fall back to
+`<state-root>/prose-craft/run/`.
+
 ## Migrating from the old plugin
 
 If you have existing voices in `${CLAUDE_PLUGIN_DATA}/voices/`, copy
@@ -85,6 +116,9 @@ prose migrate voices
 ```
 
 The old directory is left untouched; delete the new one to roll back.
+
+An orphaned `.composer-state/` directory inside your voices root is inert as of
+0.4.0 — composer memory now lives under the state root. It is safe to delete.
 
 ## Using the MCP server from Claude Code
 

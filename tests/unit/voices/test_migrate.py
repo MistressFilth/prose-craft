@@ -86,6 +86,7 @@ def test_default_legacy_root_discovers_prose_voicecraft(monkeypatch, tmp_path):
     )
     (home / ".claude" / "plugins" / "data" / "prose" / "voices").mkdir(parents=True)
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))  # Path.home() reads this on Windows
     result = default_legacy_root()
     assert result == voice_craft_root
     assert result.exists()
@@ -99,5 +100,6 @@ def test_default_legacy_root_falls_back_to_bare_prose(monkeypatch, tmp_path):
     bare = home / ".claude" / "plugins" / "data" / "prose" / "voices"
     bare.mkdir(parents=True)
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))  # Path.home() reads this on Windows
     result = default_legacy_root()
     assert result == bare

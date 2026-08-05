@@ -15,7 +15,8 @@ agents load.
 
 ## Voice profile schema
 
-Every voice lives at `$XDG_DATA_HOME/prose-craft/voices/<name>/voice.md`
+Every voice lives at `<voices-root>/<name>/voice.md`, where `<voices-root>` is
+platform-dependent — run `prose config` to resolve it.
 as a single file with YAML front-matter and an optional prose body.
 Agents read and write the front-matter via `src/prose_craft/voices/io.py`
 (pyyaml preserves the prose body verbatim).

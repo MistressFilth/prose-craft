@@ -22,7 +22,8 @@ from prose_craft.agents.results import (
     SubstitutionPlan,
     VoiceDelta,
 )
-from prose_craft.config import get_model, get_voices_root
+from prose_craft.config import get_model
+from prose_craft.paths import voices_root as _default_voices_root
 from prose_craft.orchestrator.deps import (
     AnalysisDeps,
     ArchitectDeps,
@@ -73,7 +74,7 @@ class ProseCraft:
         log_level: str = "INFO",
     ) -> None:
         self.model = model or get_model()
-        self.voices_root = (voices_root or get_voices_root()).resolve()
+        self.voices_root = (voices_root or _default_voices_root()).resolve()
         self.log_level = log_level
         self._agents: dict[str, Agent] = {}
 

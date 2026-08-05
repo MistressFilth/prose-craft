@@ -12,6 +12,7 @@ from prose_craft.agents.results import VoiceDelta
 from prose_craft.agents.tools import bind_composer_tools
 from prose_craft.orchestrator.deps import ComposerDeps
 from prose_craft.orchestrator.prompts import VOICE_COMPOSER_SYSTEM_PROMPT, format_audience_block
+from prose_craft.paths import composer_state_dir
 from prose_craft.voices.audience import ResolvedAudience
 
 
@@ -25,8 +26,10 @@ def build_voice_composer(
 
     The composer is the only agent with a harness ``Memory`` capability
     so the wizard can resume across CLI invocations. Memory is backed
-    by a persistent ``FileStore`` rooted under ``voices_root`` so the
-    resume state survives process exit.
+    by a persistent ``FileStore`` under the application state directory
+    (``<state_root>/prose-craft/composer-state/``), so composer memory
+    is not mixed into the user's voice library and survives process
+    exit. The voice tools are still bound to ``voices_root``.
 
     Per the spec's Agent Contracts table, the composer is the one agent
     that does NOT receive ``read_file``; instead it operates through the
@@ -42,7 +45,7 @@ def build_voice_composer(
     separately so the model can surface a writer's literal choices.
     """
     root = Path(voices_root)
-    store_path = root / ".composer-state"
+    store_path = composer_state_dir()
     store_path.mkdir(parents=True, exist_ok=True)
     capabilities = [Memory(namespace="prose-craft", store=FileStore(store_path))]
 

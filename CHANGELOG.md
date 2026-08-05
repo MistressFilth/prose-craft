@@ -2,9 +2,27 @@
 
 ## [Unreleased]
 
+### Added
+- Windows and macOS are now supported and tested platforms; CI runs the full suite on Linux, macOS, and Windows. `pyproject.toml` declares the corresponding `Operating System` classifiers.
+- Directory resolution honors the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/) on every platform, falling back to each platform's native convention when the XDG variables are unset. Five overrides — `PROSE_CRAFT_XDG_DATA_HOME`, `_CONFIG_HOME`, `_CACHE_HOME`, `_STATE_HOME`, `_RUNTIME_DIR` — take precedence over the corresponding `XDG_*` variables, which take precedence over the native default. A value that is empty or relative is ignored, as the specification requires.
+- `prose_craft.xdg` owns resolution; `prose_craft.paths` owns the layout. No other module reads an `XDG_*` variable.
+
+### Changed
+- Composer memory moved from `<voices_root>/.composer-state/` to the application state directory (`<state_root>/prose-craft/composer-state/`). It is agent state, not user data, and no longer sits inside the voice library. An orphaned `.composer-state/` left by an earlier version is inert and safe to delete.
+- `prose config` no longer writes `PROSE_CRAFT_MODEL` or `PROSE_CRAFT_VOICES_ROOT` into the process environment. The flags affect only what the command prints.
+- `platformdirs` is now a direct dependency. It was already present transitively, so no new package is installed.
+- Plugin documentation refers to `<voices-root>` rather than `$XDG_DATA_HOME/prose-craft/voices`, which was only ever accurate on Linux. The voice-backup convention moved from inside the voices root to `<state-root>/prose-craft/backups/`.
+
+**No migration is required.** The voices root is unchanged on Linux and macOS.
+
 ### Fixed
+- `prose voice draft` without `--to` no longer leaves a stray `.md` file in the system temp directory. The scratch file is created under the runtime directory and removed when the command finishes, including on failure.
+- Scratch files no longer fail outright when `XDG_RUNTIME_DIR` is exported but unusable — common under WSL, in containers, and in ssh sessions without a login session. The runtime root falls back to `<state_root>/prose-craft/run/`, which the specification sanctions.
+- An unset `HOME` no longer resolves the voices root to a path relative to the current working directory.
+- A relative value in `XDG_DATA_HOME` is now ignored instead of being resolved against the current working directory.
 - `migrate voices` now discovers the newer `prose-voicecraft-prose-voicecraft` plugin-data directory in addition to the original `prose` directory. Users with the 17-voice discordian library cached under the new plugin name get the right source root on first migrate; previously the default pointed at an empty `prose/` dir and silently copied nothing.
 - `voice list` now surfaces broken voice files via `list_voice_errors` instead of silently dropping them from the count. A voice whose front-matter fails to parse against the current schema is reported to stderr (e.g. `error: new-voice: 3 validation errors for VoiceProfile ...`) so the user can see why a voice is missing from the list rather than seeing a quietly truncated count.
+- Two `migrate voices` tests asserted against the real user profile on Windows rather than a temporary directory, because they pinned `HOME` while `Path.home()` reads `USERPROFILE` there. They now pin both.
 
 ### Removed
 - Bundled-voice fallback in voice discovery: `get_bundled_voices_root()` and the wheel-side fallback in `read_voice` / `list_voices` are gone. Voices resolve against the user root only.

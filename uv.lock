@@ -868,11 +868,12 @@ wheels = [
 
 [[package]]
 name = "prose-craft"
-version = "0.3.1"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
     { name = "mcp" },
+    { name = "platformdirs" },
     { name = "pydantic" },
     { name = "pydantic-ai-harness", extra = ["code-mode", "dynamic-workflow"] },
     { name = "pydantic-ai-slim" },
@@ -895,6 +896,7 @@ dev = [
 requires-dist = [
     { name = "fastmcp", specifier = ">=2.0" },
     { name = "mcp", specifier = ">=1.0" },
+    { name = "platformdirs", specifier = ">=4.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pydantic-ai-harness", extras = ["code-mode", "dynamic-workflow"], specifier = ">=0.1" },
     { name = "pydantic-ai-slim", specifier = ">=2.18" },

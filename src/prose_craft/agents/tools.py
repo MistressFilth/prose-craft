@@ -53,8 +53,8 @@ def run_voice_check_tool(
     """Run the deterministic voice checker against ``text``.
 
     Loads the named ``VoiceProfile`` from the standard voice root
-    (``PROSE_CRAFT_VOICES_ROOT`` env var or platform default) and
-    returns the JSON-serialized ``VoiceVerdict``.
+    (``prose_craft.paths.voices_root()``) and returns the
+    JSON-serialized ``VoiceVerdict``.
 
     The agent decides whether to layer model-judged entries on top; this
     primitive returns only the deterministic mechanical + statistical

@@ -8,9 +8,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from prose_craft.paths import voices_root
 from prose_craft.voices.location import (
     VoiceNameError,
-    get_voices_root,
     voice_path,
 )
 
@@ -70,7 +70,7 @@ def migrate_voices(
     overwrite=True. Returns a MigrationReport enumerating outcomes.
     """
     src_path = (src or default_legacy_root()).resolve()
-    dst_path = (dst or get_voices_root()).resolve()
+    dst_path = (dst or voices_root()).resolve()
     report = MigrationReport()
 
     if not src_path.exists():

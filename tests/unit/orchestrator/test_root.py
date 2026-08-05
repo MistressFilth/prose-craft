@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import types
+from pathlib import Path
 
 import pytest
 from pydantic_ai import ModelMessage, ModelResponse, TextPart
@@ -19,14 +20,16 @@ def _stub_response(content: str):
     return FunctionModel(fn)
 
 
-def test_prose_craft_constructs_with_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", "/tmp/test-voices")
+def test_prose_craft_constructs_with_defaults(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path / "test-voices"))
     craft = ProseCraft()
     assert craft.model == "anthropic:claude-opus-4-5"
     assert str(craft.voices_root).endswith("test-voices")
 
 
-def test_prose_craft_lazy_build(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_prose_craft_lazy_build(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Lazy accessor caches the agent on first access; second access returns same instance.
 
     The real `prose_craft.agents.analyst` module lands in task 22, so this
@@ -34,7 +37,7 @@ def test_prose_craft_lazy_build(monkeypatch: pytest.MonkeyPatch) -> None:
     path today. Replace the `sys.modules` injection with a real factory
     import once task 22 lands.
     """
-    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", "/tmp/test-voices")
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path / "test-voices"))
 
     # Sentinel that stands in for the Agent instance the real factory would return.
     fake_agent = object()
