@@ -99,3 +99,22 @@ def test_cli_unexpected_error_prints_traceback_and_exits_one(monkeypatch, tmp_pa
     assert result.exit_code == 1
     assert "Traceback (most recent call last)" in result.output
     assert "RuntimeError: boom" in result.output
+
+
+def test_config_does_not_mutate_environment(monkeypatch, tmp_path) -> None:
+    """--voices-root affects the printed value only, not process env."""
+    import os
+
+    monkeypatch.delenv("PROSE_CRAFT_VOICES_ROOT", raising=False)
+    monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
+
+    result = runner.invoke(
+        app,
+        ["config", "--voices-root", str(tmp_path), "--model", "anthropic:claude-haiku-4-5"],
+    )
+
+    assert result.exit_code == 0
+    assert str(tmp_path) in result.stdout
+    assert "anthropic:claude-haiku-4-5" in result.stdout
+    assert "PROSE_CRAFT_VOICES_ROOT" not in os.environ
+    assert "PROSE_CRAFT_MODEL" not in os.environ

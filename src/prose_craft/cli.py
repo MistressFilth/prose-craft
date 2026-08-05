@@ -124,14 +124,8 @@ def config(
     ),
 ) -> None:
     """Print the active model and voices root."""
-    import os
-
-    if model:
-        os.environ["PROSE_CRAFT_MODEL"] = model
-    if voices_root:
-        os.environ["PROSE_CRAFT_VOICES_ROOT"] = str(voices_root)
-    typer.echo(f"model: {get_model()}")
-    typer.echo(f"voices_root: {_default_voices_root()}")
+    typer.echo(f"model: {model or get_model()}")
+    typer.echo(f"voices_root: {_voices_root_opt(voices_root)}")
 
 
 @voice_app.command("list")
