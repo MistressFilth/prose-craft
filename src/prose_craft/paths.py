@@ -59,6 +59,12 @@ def app_state_dir() -> Path:
 def app_runtime_dir() -> Path:
     """``<runtime_root>/prose-craft``, created.
 
+    If the advertised runtime root cannot be used, fall back to
+    ``<state_root>/prose-craft/run``. Environments routinely export
+    ``XDG_RUNTIME_DIR`` without creating it — WSL, containers, cron, and
+    ssh sessions with no login session all do — and the specification
+    sanctions a replacement directory rather than a hard failure.
+
     Mode ``0700`` is applied on POSIX, where the specification asks for
     it, and is re-applied on every call so a loosened directory heals
     itself. It is skipped on Windows: ``os.chmod`` there honors only the
@@ -66,7 +72,11 @@ def app_runtime_dir() -> Path:
     hold.
     """
     path = xdg.runtime_dir() / APP
-    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        path = xdg.state_home() / APP / "run"
+        path.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
         path.chmod(0o700)
     return path

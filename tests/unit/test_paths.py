@@ -184,3 +184,35 @@ def test_scratch_dir_created_under_runtime(monkeypatch: pytest.MonkeyPatch, tmp_
     scratch = paths.scratch_dir()
     assert scratch == tmp_path / "run" / "prose-craft" / "scratch"
     assert scratch.is_dir()
+
+
+def test_app_runtime_dir_falls_back_when_runtime_root_unusable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An advertised-but-unusable runtime root must not break the app.
+
+    WSL, containers, cron, and ssh sessions without a login session all
+    export XDG_RUNTIME_DIR without creating it. The specification
+    sanctions a replacement directory rather than a hard failure.
+    """
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory", encoding="utf-8")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(blocker / "run"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+    resolved = paths.app_runtime_dir()
+
+    assert resolved == tmp_path / "state" / "prose-craft" / "run"
+    assert resolved.is_dir()
+
+
+def test_scratch_dir_uses_the_fallback_too(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory", encoding="utf-8")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(blocker / "run"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+    scratch = paths.scratch_dir()
+
+    assert scratch == tmp_path / "state" / "prose-craft" / "run" / "scratch"
+    assert scratch.is_dir()
