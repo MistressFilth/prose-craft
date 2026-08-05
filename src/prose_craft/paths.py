@@ -41,6 +41,7 @@ __all__ = [
     "app_runtime_dir",
     "app_state_dir",
     "composer_state_dir",
+    "default_voices_root",
     "scratch_dir",
     "voices_root",
 ]
@@ -92,6 +93,11 @@ def voices_root() -> Path:
     explicit = xdg.env_path("PROSE_CRAFT_VOICES_ROOT")
     if explicit is not None:
         return explicit
+    return default_voices_root()
+
+
+def default_voices_root() -> Path:
+    """Return the XDG-derived default voice profile store without creating it."""
     return app_data_dir() / "voices"
 
 

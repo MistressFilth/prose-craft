@@ -93,6 +93,17 @@ def test_voices_root_ignores_invalid_override(
     assert paths.voices_root() == tmp_path / "data" / "prose-craft" / "voices"
 
 
+def test_default_voices_root_composes_from_data_home(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+
+    assert paths.default_voices_root() == (
+        tmp_path / "data" / "prose-craft" / "voices"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Composer state
 # ---------------------------------------------------------------------------
