@@ -6,6 +6,9 @@
 - `migrate voices` now discovers the newer `prose-voicecraft-prose-voicecraft` plugin-data directory in addition to the original `prose` directory. Users with the 17-voice discordian library cached under the new plugin name get the right source root on first migrate; previously the default pointed at an empty `prose/` dir and silently copied nothing.
 - `voice list` now surfaces broken voice files via `list_voice_errors` instead of silently dropping them from the count. A voice whose front-matter fails to parse against the current schema is reported to stderr (e.g. `error: new-voice: 3 validation errors for VoiceProfile ...`) so the user can see why a voice is missing from the list rather than seeing a quietly truncated count.
 
+### Removed
+- Bundled-voice fallback in voice discovery: `get_bundled_voices_root()` and the wheel-side fallback in `read_voice` / `list_voices` are gone. Voices resolve against the user root only.
+
 ## [0.3.0] - 2026-08-03
 
 ### Added
