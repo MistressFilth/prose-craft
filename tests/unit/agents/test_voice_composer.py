@@ -423,3 +423,35 @@ def test_voice_composer_end_to_end_pipeline(tmp_path: Path):
     assert reloaded_profile.purpose == "new purpose"
     assert "Original prose body" in reloaded_body
     assert "[bracket]" in reloaded_body
+
+
+# ---------------------------------------------------------------------------
+# Composer memory is state, not user data. It must not land in the
+# voices root.
+# ---------------------------------------------------------------------------
+
+
+def test_composer_state_is_not_written_under_voices_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: the FileStore used to be created at <voices_root>/.composer-state."""
+    voices_root = tmp_path / "voices"
+    voices_root.mkdir()
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+    build_voice_composer("test", voices_root)
+
+    assert not (voices_root / ".composer-state").exists()
+    assert list(voices_root.iterdir()) == []
+
+
+def test_composer_state_lands_in_the_state_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    voices_root = tmp_path / "voices"
+    voices_root.mkdir()
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+    build_voice_composer("test", voices_root)
+
+    assert (tmp_path / "state" / "prose-craft" / "composer-state").is_dir()
