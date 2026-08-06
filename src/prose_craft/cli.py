@@ -839,15 +839,19 @@ def voice_edit(
     ),
 ) -> None:
     """Edit a file in the named voice."""
+    from prose_craft.config import load_settings
     from prose_craft.voices.index import Origin, VoiceIndex
     from prose_craft.voices.io import VoiceImportError, import_voice
 
+    shadow_root = (
+        voices_root if voices_root is not None else load_settings().voices_root
+    )
     entry = VoiceIndex.build().get(voice)
     if entry is not None and entry.origin is Origin.SHARED:
         try:
-            import_voice(voice)
+            import_voice(voice, root=shadow_root)
         except VoiceImportError:
-            pass  # already in user root; no-op
+            pass  # already in user root (default or override); no-op
 
     from prose_craft.orchestrator.deps import StylistDeps
     from prose_craft.voices.audience import resolve_audience

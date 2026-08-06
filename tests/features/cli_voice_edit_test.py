@@ -59,10 +59,32 @@ def test_edit_user_voice_does_not_reshadow(monkeypatch, shipped_voice, tmp_path)
         "syntax: {}\n"
         "lexicon: {}\n"
         "structure: {}\n"
-        "lore: LOCAL\n"
+        "purpose: LOCAL\n"
         "---\nbody"
     )
     monkeypatch.setenv("PROSE_CRAFT_MODEL", "anthropic:claude-opus-4-5")
     runner.invoke(app, ["voice", "edit", str(target), "--voice", "shipped"])
     text = (user / "shipped" / "voice.md").read_text()
     assert "LOCAL" in text
+
+
+def test_edit_voices_root_override_shadows_to_override_root(
+    monkeypatch, shipped_voice, tmp_path
+):
+    user, _, target = shipped_voice
+    override = tmp_path / "override"
+    monkeypatch.setenv("PROSE_CRAFT_MODEL", "anthropic:claude-opus-4-5")
+    runner.invoke(
+        app,
+        [
+            "voice",
+            "edit",
+            str(target),
+            "--voice",
+            "shipped",
+            "--voices-root",
+            str(override),
+        ],
+    )
+    assert (override / "shipped" / "voice.md").is_file()
+    assert not (user / "shipped" / "voice.md").is_file()
