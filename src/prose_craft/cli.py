@@ -921,3 +921,21 @@ def migrate_voices_cmd(
     if report.errors:
         typer.echo(f"errors: {'; '.join(report.errors)}", err=True)
         raise typer.Exit(code=1)
+
+
+@voice_app.command("import")
+@_handle_errors
+def voice_import(
+    name: str = typer.Argument(..., help="Voice name to import from a shared root."),
+    voices_root: Path | None = typer.Option(None, "--voices-root"),
+) -> None:
+    """Copy a shared voice into the user root without editing."""
+    from prose_craft.voices.io import VoiceImportError, import_voice
+
+    shadow_root = voices_root if voices_root is not None else None
+    try:
+        target = import_voice(name, root=shadow_root)
+    except VoiceImportError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+    typer.echo(f"imported {name!r} to {target}")
