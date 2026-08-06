@@ -47,6 +47,14 @@ class VoiceParseError(ValueError):
     """
 
 
+class VoiceDeleteError(RuntimeError):
+    """Raised when an operation would mutate a shared-only voice."""
+
+
+class VoiceImportError(RuntimeError):
+    """Raised by :func:`import_voice` for collision or missing-name cases."""
+
+
 class VoiceSummary(BaseModel):
     name: str
     updated: date
@@ -172,13 +180,20 @@ def write_voice(
 
 
 def list_voices(*, root: Path | None = None) -> list[VoiceSummary]:
-    """Enumerate every voice under the user root.
+    """Enumerate every visible voice under user + shared roots.
 
-    Returns voices sorted by name. Voices without parseable front-matter
-    are skipped silently. No bundled fallback: an empty or missing root
-    yields ``[]``.
+    When ``root`` is None, walks :func:`prose_craft.voices.location.voice_roots`
+    in precedence order with the same dedupe behavior the original
+    single-root scanner used. When ``root`` is given, scans only that
+    root (escape hatch for tests and explicit overrides).
     """
-    base = root if root is not None else _default_root()
+    roots: list[Path]
+    if root is not None:
+        roots = [root]
+    else:
+        from prose_craft.voices.location import voice_roots
+
+        roots = voice_roots()
     seen: set[str] = set()
     out: list[VoiceSummary] = []
 
@@ -198,34 +213,64 @@ def list_voices(*, root: Path | None = None) -> list[VoiceSummary]:
             seen.add(profile.voice)
             out.append(VoiceSummary(name=profile.voice, updated=profile.updated))
 
-    _scan(base)
+    for r in roots:
+        _scan(r)
     return out
 
 
 def list_voice_errors(*, root: Path | None = None) -> list[VoiceError]:
     """Enumerate voice directories whose front-matter fails to parse.
 
-    Scans the user root only and returns one ``VoiceError`` per directory
-    whose ``voice.md`` does not parse against the current ``VoiceProfile``
-    schema.
-
-    The function exists so callers (``prose voice list``,
-    ``prose_craft.mcp``) can surface breakage to the user instead of
-    silently undercounting the library.
+    Walks user + shared roots when ``root=None``. The single-root
+    escape hatch (passing ``root=``) is preserved for tests.
     """
-    base = root if root is not None else _default_root()
+    roots: list[Path]
+    if root is not None:
+        roots = [root]
+    else:
+        from prose_craft.voices.location import voice_roots
+
+        roots = voice_roots()
     out: list[VoiceError] = []
-    if not base.exists():
-        return out
-    for child in sorted(base.iterdir()):
-        if not child.is_dir():
+    seen: set[str] = set()
+    for base in roots:
+        if not base.exists():
             continue
-        candidate = child / "voice.md"
-        if not candidate.is_file():
-            continue
-        try:
-            _parse_voice_file(candidate)
-        except Exception as exc:
-            summary = f"{child.name}: {exc}".splitlines()[0]
-            out.append(VoiceError(name=child.name, error=summary))
+        for child in sorted(base.iterdir()):
+            if not child.is_dir() or child.name in seen:
+                continue
+            seen.add(child.name)
+            candidate = child / "voice.md"
+            if not candidate.is_file():
+                continue
+            try:
+                _parse_voice_file(candidate)
+            except Exception as exc:
+                summary = f"{child.name}: {exc}".splitlines()[0]
+                out.append(VoiceError(name=child.name, error=summary))
     return out
+
+
+def import_voice(name: str, *, root: Path | None = None) -> Path:
+    """Copy a shared voice into the user root.
+
+    Returns the user-root target path. Raises :class:`VoiceImportError`
+    if the voice is not visible anywhere, or already present in the
+    user root. The ``root`` kwarg is preserved for symmetry with the
+    other IO helpers; pass it to redirect the destination.
+    """
+    import shutil
+
+    from prose_craft.config import load_settings
+    from prose_craft.voices.location import voice_path
+
+    user_root = load_settings().voices_root if root is None else root
+    user_target = user_root / name / "voice.md"
+    if user_target.is_file():
+        raise VoiceImportError(f"voice {name!r} already in user root at {user_target}")
+    source = voice_path(name)
+    if not source.is_file():
+        raise VoiceImportError(f"voice {name!r} not found")
+    user_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, user_target)
+    return user_target
