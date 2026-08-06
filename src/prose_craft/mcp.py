@@ -51,6 +51,15 @@ async def analyze_prose(
     surface: str | None = None,
 ) -> dict[str, object]:
     """Run the prose analyst. Returns ProseDiagnostic as JSON."""
+    # Metrics-only is a deterministic analyzer that reads only the file
+    # argument. Loading settings is wasted work and any error there
+    # must not poison the command (mirrors CLI's `analyze --metrics-only`).
+    if metrics_only and voice is None:
+        from prose_craft.analysis.metrics import analyze_prose
+        from prose_craft.agents.results import ProseDiagnostic
+
+        m = analyze_prose(Path(file_path).read_text(encoding="utf-8"))
+        return ProseDiagnostic(metrics=m, issues=[]).model_dump(mode="json")
     settings = load_settings()
     resolved: ResolvedAudience | None = None
     if voice is not None:
@@ -63,12 +72,6 @@ async def analyze_prose(
             front_matter_path=Path(file_path),
             voices_root=settings.voices_root,
         )
-    if metrics_only:
-        from prose_craft.analysis.metrics import analyze_prose
-        from prose_craft.agents.results import ProseDiagnostic
-
-        m = analyze_prose(Path(file_path).read_text(encoding="utf-8"))
-        return ProseDiagnostic(metrics=m, issues=[]).model_dump(mode="json")
     deps = AnalysisDeps(
         file_path=Path(file_path),
         voice_name=voice,

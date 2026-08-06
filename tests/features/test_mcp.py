@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
 import prose_craft.mcp as mcp_module
 from prose_craft.agents.results import (
@@ -514,16 +515,45 @@ async def test_mcp_voice_check_uses_configured_voices_root(
 async def test_mcp_voice_check_raises_on_malformed_config(
     mcp_client: Client, tmp_path: Path
 ) -> None:
-    """A broken TOML config raises ConfigurationError at tool time."""
+    """A broken TOML config surfaces as a FastMCP ToolError carrying the path."""
     path = _write_config('model = "unterminated\n')
     draft = tmp_path / "draft.md"
     draft.write_text("Simple text.", encoding="utf-8")
 
     async with mcp_client:
-        with pytest.raises(Exception) as exc:
+        with pytest.raises(ToolError) as exc:
             await mcp_client.call_tool(
                 "voice_check",
                 {"file_path": str(draft), "voice": "MistressFilth"},
             )
 
-    assert str(path) in str(exc.value)
+    message = str(exc.value)
+    assert str(path) in message
+    # FastMCP's server wrapper re-raises as ToolError(`from exc`); the
+    # underlying ConfigurationError text is preserved in the message.
+    assert "invalid configuration at" in message
+
+
+@pytest.mark.asyncio
+async def test_mcp_analyze_prose_metrics_only_survives_malformed_config(
+    mcp_client: Client, tmp_path: Path
+) -> None:
+    """Metrics-only is a deterministic analyzer: no settings load, no error.
+
+    Mirrors the CLI's `analyze --metrics-only` guarantee: a broken TOML
+    config file must not break the metrics-only path. The MCP server
+    must skip ``load_settings`` entirely when ``metrics_only=True`` and
+    no voice is requested.
+    """
+    _write_config('model = "unterminated\n')
+    draft = tmp_path / "draft.md"
+    draft.write_text("This is a short draft.", encoding="utf-8")
+
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "analyze_prose",
+            {"file_path": str(draft), "metrics_only": True},
+        )
+        data = _tool_json(result)
+
+    assert "metrics" in data
