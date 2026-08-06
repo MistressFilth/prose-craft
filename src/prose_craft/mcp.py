@@ -20,9 +20,23 @@ from prose_craft.orchestrator.deps import (
 from prose_craft.orchestrator.root import ProseCraft
 from prose_craft.voices.audience import ResolvedAudience, resolve_audience
 from prose_craft.voices.check import check_voice
+from prose_craft.voices.index import VoiceIndex
 from prose_craft.voices.io import VoiceProfileNotFound, list_voices, read_voice, read_voice_file
 
 mcp = FastMCP("prose-craft")
+_index_cache: VoiceIndex | None = None
+
+
+def _get_index() -> VoiceIndex:
+    global _index_cache
+    if _index_cache is None:
+        _index_cache = VoiceIndex.build()
+    return _index_cache
+
+
+def _invalidate_index() -> None:
+    global _index_cache
+    _index_cache = None
 
 
 def _craft(settings: ProseCraftSettings | None = None) -> ProseCraft:
