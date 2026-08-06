@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 from os import PathLike
 from pathlib import Path
 
 import pytest
+
+if sys.version_info >= (3, 11):
+    import tomllib as _tomllib
+else:  # pragma: no cover - 3.10 is the lowest supported interpreter in CI
+    import tomli as _tomllib
 
 from prose_craft.config import (
     DEFAULT_MODEL,
@@ -146,17 +152,10 @@ def test_serialize_config_round_trips_windows_backslash_path(tmp_path: Path) -> 
     :mod:`tomllib` so the test is independent of :func:`PathsSettings`
     rejecting the non-Linux-absolute path.
     """
-    import sys as _sys
-
-    if _sys.version_info >= (3, 11):
-        import tomllib as _toml
-    else:
-        import tomli as _toml
-
     windows_path = "C:\\Users\\Deirdre\\AppData\\Roaming\\prose-craft\\voices"
     text = serialize_config("anthropic:test", Path(windows_path))
 
-    parsed = _toml.loads(text)
+    parsed = _tomllib.loads(text)
 
     assert parsed["model"] == "anthropic:test"
     assert parsed["paths"]["voices_root"] == windows_path
@@ -231,17 +230,10 @@ def test_serialize_config_round_trips_mixed_separator_path(tmp_path: Path) -> No
     rather than pinning an exact string that would break on the other
     platform.
     """
-    import sys as _sys
-
-    if _sys.version_info >= (3, 11):
-        import tomllib as _toml
-    else:
-        import tomli as _toml
-
     weird = "C:/Users\\Deirdre/voices"
     text = serialize_config("anthropic:test", Path(weird))
 
-    parsed = _toml.loads(text)
+    parsed = _tomllib.loads(text)
 
     assert parsed["model"] == "anthropic:test"
     # Both forward and back slashes are preserved in the TOML string on
@@ -572,11 +564,16 @@ def test_initialize_mkstemp_failure_raises_configuration_error(
 ) -> None:
     """ENOSPC at ``mkstemp`` must surface as a clean ConfigurationError.
 
-    Previously ``tempfile.mkstemp`` ran before the ``try/except`` block;
-    a failure there raised a bare ``OSError`` and the ``finally`` clause
-    crashed on ``temporary.unlink(missing_ok=True)`` because ``temporary``
-    was never bound. The OSError boundary now wraps both so the user sees
-    a one-line message and no leftover temp file.
+    Root cause: ``tempfile.mkstemp`` ran on the line *before* the
+    ``try`` block; an OSError raised there not only escaped the
+    boundary as a bare ``OSError`` but also crashed the ``finally``
+    clause on the next line because ``temporary`` was never bound —
+    ``NameError: free variable 'temporary' referenced before assignment``
+    masked the real failure with a confusing secondary traceback. The
+    fix binds ``fd`` and ``temporary`` to safe defaults before the try
+    and wraps the creation calls in their own OSError boundary so the
+    user sees a single ``ConfigurationError(kind="could not write")``
+    line instead of an OSError plus a NameError plus a traceback.
     """
     target = config_file()
 

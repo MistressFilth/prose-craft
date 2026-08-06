@@ -73,22 +73,27 @@ def test_voice_show_raw_rejects_path_traversal(monkeypatch, tmp_path) -> None:
 
 
 @pytest.mark.parametrize(
-    "args",
+    "args, expect_message",
     [
-        ["voice", "show", "../escape"],
-        ["voice", "show", "../escape", "--raw"],
-        ["voice", "show", "name with spaces"],
-        ["voice", "show", ""],
-        ["voice", "init", "../escape"],
-        ["voice", "init", "name with spaces"],
-        ["voice", "compose", "../escape"],
-        ["voice", "refine", "../escape"],
-        ["voice", "check", "draft.md", "--voice", "../escape"],
-        ["voice", "edit", "draft.md", "--voice", "../escape"],
+        # Paths that reach ``voice_path`` and therefore raise
+        # ``VoiceNameError``; the CLI surfaces that with a one-line
+        # ``invalid voice name`` message via the dedicated handler arm.
+        (["voice", "show", "../escape"], True),
+        (["voice", "show", "../escape", "--raw"], True),
+        (["voice", "show", "name with spaces"], True),
+        (["voice", "init", "../escape"], True),
+        (["voice", "init", "name with spaces"], True),
+        (["voice", "compose", "../escape"], True),
+        (["voice", "refine", "../escape"], True),
+        # Typer rejects an empty positional name up front, before any
+        # prose-craft code runs, so the user sees Typer's own message
+        # rather than ``VoiceNameError``'s wording. The exit code is
+        # still 2 and there is no traceback.
+        (["voice", "show", ""], False),
     ],
 )
 def test_voice_subcommands_reject_invalid_name_without_traceback(
-    monkeypatch, tmp_path: Path, args: list[str]
+    monkeypatch, tmp_path: Path, args: list[str], expect_message: bool
 ) -> None:
     """Every voice subcommand surfaces :class:`VoiceNameError` as exit 2.
 
@@ -98,12 +103,64 @@ def test_voice_subcommands_reject_invalid_name_without_traceback(
     to make sure the new exception arm in :func:`_handle_errors` covers
     all of them. A failure here means a subcommand silently regressed to
     the generic ``Exception`` arm and prints a traceback.
+
+    ``expect_message=True`` cases hit ``voice_path`` and surface the
+    ``invalid voice name`` wording; ``False`` cases are stopped by
+    Typer's argument validation (empty string) before any prose-craft
+    code runs, so the wording is Typer-owned.
     """
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
     if "draft.md" in args:
         (tmp_path / "draft.md").write_text("hello world", encoding="utf-8")
     result = runner.invoke(app, args)
     assert result.exit_code == 2, result.output
+    assert "Traceback" not in result.output
+    if expect_message:
+        assert "invalid voice name" in result.output
+
+
+def test_voice_check_and_edit_reject_invalid_voice_with_existing_file(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """``voice check`` / ``voice edit`` surface an invalid ``--voice`` as exit 2.
+
+    Separated from the parameterized matrix because both commands take a
+    positional ``file`` argument that must exist (``exists=True``); the
+    test creates the file at an absolute ``tmp_path`` so Typer's
+    pre-flight check passes and the invalid voice name reaches
+    ``voice_path`` exactly once.
+    """
+    draft = tmp_path / "draft.md"
+    draft.write_text("hello world", encoding="utf-8")
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+
+    for cmd in (["voice", "check"], ["voice", "edit"]):
+        result = runner.invoke(app, [*cmd, str(draft), "--voice", "../escape"])
+        assert result.exit_code == 2, (cmd, result.output)
+        assert "invalid voice name" in result.output
+        assert "Traceback" not in result.output
+
+
+def test_voice_refine_propagates_voice_compose_exit_code(monkeypatch, tmp_path: Path) -> None:
+    """Nested Typer wrappers must preserve the inner ``typer.Exit(code)``.
+
+    Regression: ``voice_refine`` calls ``voice_compose`` directly (not
+    via the Typer dispatcher), and ``voice_compose``'s ``_handle_errors``
+    wrapper raises ``typer.Exit(code=2)`` for an invalid voice name.
+    Without an explicit ``except typer.Exit: raise`` at the top of
+    ``_handle_errors``, that Exit is a ``RuntimeError`` subclass and the
+    outer ``voice_refine`` wrapper's generic ``except Exception`` arm
+    catches it, prints a traceback, and re-raises ``typer.Exit(code=1)``
+    — silently downgrading the documented exit code and leaking a
+    traceback to a user-input error. The fix preserves the inner code
+    and suppresses the traceback.
+    """
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+
+    result = runner.invoke(app, ["voice", "refine", "../escape"])
+
+    assert result.exit_code == 2, result.output
+    assert "invalid voice name" in result.output
     assert "Traceback" not in result.output
 
 
