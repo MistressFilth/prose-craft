@@ -557,3 +557,34 @@ async def test_mcp_analyze_prose_metrics_only_survives_malformed_config(
         data = _tool_json(result)
 
     assert "metrics" in data
+
+
+@pytest.mark.asyncio
+async def test_mcp_analyze_prose_metrics_only_with_voice_survives_malformed_config(
+    mcp_client: Client, tmp_path: Path
+) -> None:
+    """Metrics-only short-circuits regardless of ``voice`` (CLI parity).
+
+    The CLI's ``analyze --metrics-only --voice X`` ignores the voice
+    and runs the deterministic analyzer. The MCP server must do the
+    same: a broken TOML config file must not break the metrics-only
+    path even when the caller also passes a voice name. The metrics-
+    only branch must skip ``load_settings`` entirely.
+    """
+    _write_config('model = "unterminated\n')
+    draft = tmp_path / "draft.md"
+    draft.write_text("This is a short draft.", encoding="utf-8")
+
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "analyze_prose",
+            {
+                "file_path": str(draft),
+                "metrics_only": True,
+                "voice": "MistressFilth",
+            },
+        )
+        data = _tool_json(result)
+
+    assert "metrics" in data
+    assert "issues" in data  # ProseDiagnostic shape preserved

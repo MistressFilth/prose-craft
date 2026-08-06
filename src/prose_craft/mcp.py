@@ -54,7 +54,10 @@ async def analyze_prose(
     # Metrics-only is a deterministic analyzer that reads only the file
     # argument. Loading settings is wasted work and any error there
     # must not poison the command (mirrors CLI's `analyze --metrics-only`).
-    if metrics_only and voice is None:
+    # The CLI ignores ``voice`` on this path; the MCP server must too, so
+    # a caller that pairs ``metrics_only=True`` with a voice name still
+    # gets a deterministic result without parsing the config file.
+    if metrics_only:
         from prose_craft.analysis.metrics import analyze_prose
         from prose_craft.agents.results import ProseDiagnostic
 

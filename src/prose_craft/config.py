@@ -49,8 +49,8 @@ from prose_craft import xdg
 from prose_craft.paths import APP, default_voices_root
 
 if sys.version_info >= (3, 11):
-    import tomllib
-else:  # pragma: no cover - 3.11+ branch covered above
+    import tomllib  # pragma: no cover - 3.10 is the lowest supported interpreter
+else:
     import tomli as tomllib
 
 __all__ = [
@@ -183,11 +183,19 @@ class XdgTomlSettingsSource(TomlConfigSettingsSource):
 
 
 class ConfigurationError(RuntimeError):
-    """A config file failed validation. The offending path is on ``.path``."""
+    """A config file failed validation. The offending path is on ``.path``.
 
-    def __init__(self, path: Path, detail: str) -> None:
+    The default wording is "invalid" because the common case is a
+    read-side validation failure (malformed TOML, unknown keys, wrong
+    types). Write-side failures during :func:`initialize_config` pass
+    ``kind="could not write"`` so the message accurately describes the
+    failure mode — a permission error or a full disk is not an invalid
+    configuration file.
+    """
+
+    def __init__(self, path: Path, detail: str, *, kind: str = "invalid") -> None:
         self.path = path
-        super().__init__(f"invalid configuration at {path}: {detail}")
+        super().__init__(f"{kind} configuration at {path}: {detail}")
 
 
 class ConfigAlreadyExists(ConfigurationError):
@@ -292,7 +300,7 @@ def initialize_config() -> Path:
     except ConfigAlreadyExists:
         raise
     except OSError as exc:
-        raise ConfigurationError(target, str(exc)) from exc
+        raise ConfigurationError(target, str(exc), kind="could not write") from exc
     finally:
         if descriptor_open:
             os.close(fd)

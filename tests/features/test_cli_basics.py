@@ -6,7 +6,9 @@ import json
 import os
 from pathlib import Path
 
+import click
 import pytest
+import typer
 from pydantic_ai import ModelRetry, UsageLimitExceeded
 from typer.testing import CliRunner
 
@@ -329,8 +331,15 @@ def test_toml_overrides_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     assert f"voices_root: {toml_root}" in result.output
 
 
-def test_config_init_dirties_no_env_after_load(monkeypatch: pytest.MonkeyPatch) -> None:
-    """initialize_config must not leak env vars into the caller."""
+def test_config_init_dirties_no_env_after_load(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """initialize_config must not leak env vars into the caller.
+
+    The config file this test writes lives under ``tmp_path``; the
+    per-test ``_isolated_dirs`` fixture guarantees the next test gets a
+    fresh tmp_path, so no manual cleanup is needed.
+    """
     monkeypatch.delenv("PROSE_CRAFT_VOICES_ROOT", raising=False)
     monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
 
@@ -339,6 +348,45 @@ def test_config_init_dirties_no_env_after_load(monkeypatch: pytest.MonkeyPatch) 
     assert result.exit_code == 0, result.output
     assert "PROSE_CRAFT_VOICES_ROOT" not in os.environ
     assert "PROSE_CRAFT_MODEL" not in os.environ
-    # Clean up: remove the freshly written config so conftest isolation
-    # stays straightforward for the next test.
-    config_file().unlink(missing_ok=True)
+    assert config_file() == tmp_path / ".xdg" / "config" / "prose-craft" / "config.toml"
+
+
+# ---------------------------------------------------------------------------
+# Dependency-contract probe: Typer and Click expose independent class
+# hierarchies. ``typer.BadParameter`` lives in ``typer._click.exceptions``
+# (Typer's bundled internal copy of Click); the CLI's ``except
+# (typer.BadParameter, click.UsageError)`` clause must catch both
+# because they are not related by inheritance. Removing either branch
+# would silently re-introduce tracebacks on parameter conflicts.
+# ---------------------------------------------------------------------------
+
+
+def test_typer_bad_parameter_is_not_a_click_usage_error_subclass() -> None:
+    """Probe: ``typer.BadParameter`` is not a subclass of ``click.UsageError``.
+
+    Verified against ``typer==0.27.0`` and ``click==8.4.2``. If a future
+    upgrade unifies the two (e.g. Typer re-exports Click directly), the
+    ``except (typer.BadParameter, click.UsageError)`` clause in
+    :func:`prose_craft.cli._handle_errors` can be simplified to the
+    broader class only — but until that happens, the tuple is required.
+    """
+    assert typer.BadParameter.__module__ == "typer._click.exceptions"
+    assert click.UsageError.__module__ == "click.exceptions"
+    assert not issubclass(typer.BadParameter, click.UsageError)
+    assert not issubclass(click.UsageError, typer.BadParameter)
+
+
+def test_config_init_combined_override_still_exits_two_without_traceback() -> None:
+    """End-to-end smoke for the exception tuple.
+
+    If :func:`prose_craft.cli._handle_errors` ever drops either
+    ``typer.BadParameter`` or ``click.UsageError`` from the catch
+    tuple, this command would print a traceback instead of a one-line
+    message and exit 2. The probe above pins the contract; this test
+    exercises the path.
+    """
+    result = runner.invoke(app, ["config", "--init", "--model", "anthropic:test"])
+    assert result.exit_code == 2
+    assert "--init" in result.output
+    assert "cannot be combined" in result.output
+    assert "Traceback" not in result.output

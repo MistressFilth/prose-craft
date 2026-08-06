@@ -6,7 +6,7 @@
 - Windows and macOS are now supported and tested platforms; CI runs the full suite on Linux, macOS, and Windows. `pyproject.toml` declares the corresponding `Operating System` classifiers.
 - Directory resolution honors the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/) on every platform, falling back to each platform's native convention when the XDG variables are unset. Five overrides — `PROSE_CRAFT_XDG_DATA_HOME`, `_CONFIG_HOME`, `_CACHE_HOME`, `_STATE_HOME`, `_RUNTIME_DIR` — take precedence over the corresponding `XDG_*` variables, which take precedence over the native default. A value that is empty or relative is ignored, as the specification requires.
 - `prose_craft.xdg` owns resolution; `prose_craft.paths` owns the layout. No other module reads an `XDG_*` variable.
-- Strict persistent configuration at the platform config root under `prose-craft/config.toml`, with CLI-over-environment-over-file precedence and non-overwriting `prose config --init` creation.
+- Strict persistent configuration at the platform config root under `prose-craft/config.toml`, with CLI-over-environment-over-TOML precedence and non-overwriting `prose config --init` creation.
 
 ### Changed
 - Composer memory moved from `<voices_root>/.composer-state/` to the application state directory (`<state_root>/prose-craft/composer-state/`). It is agent state, not user data, and no longer sits inside the voice library. An orphaned `.composer-state/` left by an earlier version is inert and safe to delete.
@@ -25,6 +25,8 @@
 - `migrate voices` now discovers the newer `prose-voicecraft-prose-voicecraft` plugin-data directory in addition to the original `prose` directory. Users with the 17-voice discordian library cached under the new plugin name get the right source root on first migrate; previously the default pointed at an empty `prose/` dir and silently copied nothing.
 - `voice list` now surfaces broken voice files via `list_voice_errors` instead of silently dropping them from the count. A voice whose front-matter fails to parse against the current schema is reported to stderr (e.g. `error: new-voice: 3 validation errors for VoiceProfile ...`) so the user can see why a voice is missing from the list rather than seeing a quietly truncated count.
 - Two `migrate voices` tests asserted against the real user profile on Windows rather than a temporary directory, because they pinned `HOME` while `Path.home()` reads `USERPROFILE` there. They now pin both.
+- MCP `analyze_prose` now short-circuits on `metrics_only=True` regardless of the `voice` argument, matching the CLI's `analyze --metrics-only` guarantee; a broken TOML config file with `metrics_only=True --voice X` no longer fails with a configuration error.
+- `prose config --init` write-side failures (e.g. permission denied, fsync error) now report "could not write configuration at <path>" instead of "invalid configuration at <path>"; read-side wording is unchanged.
 
 ### Removed
 - Bundled-voice fallback in voice discovery: `get_bundled_voices_root()` and the wheel-side fallback in `read_voice` / `list_voices` are gone. Voices resolve against the user root only.
