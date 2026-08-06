@@ -1,8 +1,6 @@
 """MCP voice index cache behavior."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from prose_craft import mcp

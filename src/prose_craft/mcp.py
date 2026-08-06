@@ -22,7 +22,7 @@ from prose_craft.orchestrator.root import ProseCraft
 from prose_craft.voices.audience import ResolvedAudience, resolve_audience
 from prose_craft.voices.check import check_voice
 from prose_craft.voices.index import VoiceIndex
-from prose_craft.voices.io import VoiceProfileNotFound, list_voices, read_voice, read_voice_file
+from prose_craft.voices.io import VoiceProfileNotFound, read_voice
 
 mcp = FastMCP("prose-craft")
 _index_cache: VoiceIndex | None = None

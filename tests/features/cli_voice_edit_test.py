@@ -1,8 +1,6 @@
 """Feature tests for auto-shadow before voice edit."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from typer.testing import CliRunner
 
