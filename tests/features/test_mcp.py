@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
 import prose_craft.mcp as mcp_module
 from prose_craft.agents.results import (
@@ -19,7 +20,17 @@ from prose_craft.agents.results import (
     SubstitutionPlan,
     VoiceDelta,
 )
+from prose_craft.config import config_file
 from prose_craft.mcp import mcp
+from prose_craft.voices import io as voices_io
+
+
+def _write_config(text: str) -> Path:
+    """Write ``text`` to the test's XDG config.toml and return the path."""
+    path = config_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
 
 
 @pytest.fixture
@@ -111,7 +122,7 @@ def _write_voice(
 
 
 def _patch_fake_craft(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(mcp_module, "_craft", lambda: _FakeCraft())
+    monkeypatch.setattr(mcp_module, "_craft", lambda _settings=None: _FakeCraft())
 
 
 def test_mcp_server_module_imports() -> None:
@@ -466,3 +477,114 @@ async def test_mcp_voice_compose_step_accepts_audience_param(
         )
         data = json.loads(_tool_text(result))
         assert data == [{"field": "purpose", "value": "test voice", "prompt": "test prompt"}]
+
+
+@pytest.mark.asyncio
+async def test_mcp_voice_check_uses_configured_voices_root(
+    mcp_client: Client, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A TOML-configured voices_root is the source for voice reads."""
+    configured = tmp_path / "configured-voices"
+    _write_config(f'[paths]\nvoices_root = "{configured.as_posix()}"\n')
+    _write_voice(configured, name="ConfiguredVoice", banned="[banned]")
+    draft = tmp_path / "draft.md"
+    draft.write_text("This is banned text.", encoding="utf-8")
+
+    captured: list[Path | None] = []
+    real_read_voice = voices_io.read_voice
+
+    def capture_read_voice(name: str, *, root: Path | None = None):
+        captured.append(root)
+        return real_read_voice(name, root=root)
+
+    monkeypatch.setattr(mcp_module, "read_voice", capture_read_voice)
+
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "voice_check",
+            {"file_path": str(draft), "voice": "ConfiguredVoice"},
+        )
+        data = _tool_json(result)
+
+    assert "mechanical" in data
+    assert any(violation["rule"] == "diction.banned" for violation in data["mechanical"])
+    assert configured in captured
+
+
+@pytest.mark.asyncio
+async def test_mcp_voice_check_raises_on_malformed_config(
+    mcp_client: Client, tmp_path: Path
+) -> None:
+    """A broken TOML config surfaces as a FastMCP ToolError carrying the path."""
+    path = _write_config('model = "unterminated\n')
+    draft = tmp_path / "draft.md"
+    draft.write_text("Simple text.", encoding="utf-8")
+
+    async with mcp_client:
+        with pytest.raises(ToolError) as exc:
+            await mcp_client.call_tool(
+                "voice_check",
+                {"file_path": str(draft), "voice": "MistressFilth"},
+            )
+
+    message = str(exc.value)
+    assert str(path) in message
+    # FastMCP's server wrapper re-raises as ToolError(`from exc`); the
+    # underlying ConfigurationError text is preserved in the message.
+    assert "invalid configuration at" in message
+
+
+@pytest.mark.asyncio
+async def test_mcp_analyze_prose_metrics_only_survives_malformed_config(
+    mcp_client: Client, tmp_path: Path
+) -> None:
+    """Metrics-only is a deterministic analyzer: no settings load, no error.
+
+    Mirrors the CLI's `analyze --metrics-only` guarantee: a broken TOML
+    config file must not break the metrics-only path. The MCP server
+    must skip ``load_settings`` entirely when ``metrics_only=True`` and
+    no voice is requested.
+    """
+    _write_config('model = "unterminated\n')
+    draft = tmp_path / "draft.md"
+    draft.write_text("This is a short draft.", encoding="utf-8")
+
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "analyze_prose",
+            {"file_path": str(draft), "metrics_only": True},
+        )
+        data = _tool_json(result)
+
+    assert "metrics" in data
+
+
+@pytest.mark.asyncio
+async def test_mcp_analyze_prose_metrics_only_with_voice_survives_malformed_config(
+    mcp_client: Client, tmp_path: Path
+) -> None:
+    """Metrics-only short-circuits regardless of ``voice`` (CLI parity).
+
+    The CLI's ``analyze --metrics-only --voice X`` ignores the voice
+    and runs the deterministic analyzer. The MCP server must do the
+    same: a broken TOML config file must not break the metrics-only
+    path even when the caller also passes a voice name. The metrics-
+    only branch must skip ``load_settings`` entirely.
+    """
+    _write_config('model = "unterminated\n')
+    draft = tmp_path / "draft.md"
+    draft.write_text("This is a short draft.", encoding="utf-8")
+
+    async with mcp_client:
+        result = await mcp_client.call_tool(
+            "analyze_prose",
+            {
+                "file_path": str(draft),
+                "metrics_only": True,
+                "voice": "MistressFilth",
+            },
+        )
+        data = _tool_json(result)
+
+    assert "metrics" in data
+    assert "issues" in data  # ProseDiagnostic shape preserved

@@ -10,6 +10,7 @@ from fastmcp import FastMCP
 from prose_craft.analysis.clause_density import measure_clause_density
 from prose_craft.analysis.dispersion import measure_set
 from prose_craft.analysis.sentences import tokenize_words
+from prose_craft.config import ProseCraftSettings, load_settings
 from prose_craft.orchestrator.deps import (
     AnalysisDeps,
     ArchitectDeps,
@@ -24,8 +25,18 @@ from prose_craft.voices.io import VoiceProfileNotFound, list_voices, read_voice,
 mcp = FastMCP("prose-craft")
 
 
-def _craft() -> ProseCraft:
-    return ProseCraft()
+def _craft(settings: ProseCraftSettings | None = None) -> ProseCraft:
+    """Build :class:`ProseCraft` from the active settings.
+
+    Each tool loads settings once at entry and threads the result into
+    both audience/voice reads and :class:`ProseCraft` so the TOML
+    config file is parsed exactly once per request. Pass ``settings``
+    when the caller already holds them; passing ``None`` triggers a
+    fresh load (the test seam uses this).
+    """
+    if settings is None:
+        settings = load_settings()
+    return ProseCraft(model=settings.model, voices_root=settings.voices_root)
 
 
 @mcp.tool
@@ -40,6 +51,19 @@ async def analyze_prose(
     surface: str | None = None,
 ) -> dict[str, object]:
     """Run the prose analyst. Returns ProseDiagnostic as JSON."""
+    # Metrics-only is a deterministic analyzer that reads only the file
+    # argument. Loading settings is wasted work and any error there
+    # must not poison the command (mirrors CLI's `analyze --metrics-only`).
+    # The CLI ignores ``voice`` on this path; the MCP server must too, so
+    # a caller that pairs ``metrics_only=True`` with a voice name still
+    # gets a deterministic result without parsing the config file.
+    if metrics_only:
+        from prose_craft.analysis.metrics import analyze_prose
+        from prose_craft.agents.results import ProseDiagnostic
+
+        m = analyze_prose(Path(file_path).read_text(encoding="utf-8"))
+        return ProseDiagnostic(metrics=m, issues=[]).model_dump(mode="json")
+    settings = load_settings()
     resolved: ResolvedAudience | None = None
     if voice is not None:
         resolved = resolve_audience(
@@ -49,21 +73,15 @@ async def analyze_prose(
             cli_dial=dial_ceiling,
             cli_surface=surface,
             front_matter_path=Path(file_path),
-            voices_root=None,
+            voices_root=settings.voices_root,
         )
-    if metrics_only:
-        from prose_craft.analysis.metrics import analyze_prose
-        from prose_craft.agents.results import ProseDiagnostic
-
-        m = analyze_prose(Path(file_path).read_text(encoding="utf-8"))
-        return ProseDiagnostic(metrics=m, issues=[]).model_dump(mode="json")
     deps = AnalysisDeps(
         file_path=Path(file_path),
         voice_name=voice,
         tolerance=tolerance,
         audience=resolved,
     )
-    result = await _craft().analyst(audience=resolved).run("Analyze this prose.", deps=deps)
+    result = await _craft(settings).analyst(audience=resolved).run("Analyze this prose.", deps=deps)
     return result.output.model_dump(mode="json")
 
 
@@ -79,6 +97,7 @@ async def voice_check(
     surface: str | None = None,
 ) -> dict[str, object]:
     """Deterministic voice check. Returns VoiceVerdict as JSON."""
+    settings = load_settings()
     resolved = resolve_audience(
         voice,
         cli_audience=audience,
@@ -86,9 +105,9 @@ async def voice_check(
         cli_dial=dial_ceiling,
         cli_surface=surface,
         front_matter_path=Path(file_path),
-        voices_root=None,
+        voices_root=settings.voices_root,
     )
-    profile = read_voice(voice)
+    profile = read_voice(voice, root=settings.voices_root)
     text = Path(file_path).read_text(encoding="utf-8")
     verdict = check_voice(
         text,
@@ -134,6 +153,7 @@ async def edit_prose(
     surface: str | None = None,
 ) -> dict[str, object]:
     """Run the four-pass editor. Returns EditResult as JSON."""
+    settings = load_settings()
     resolved: ResolvedAudience | None = None
     if voice is not None:
         resolved = resolve_audience(
@@ -143,7 +163,7 @@ async def edit_prose(
             cli_dial=dial_ceiling,
             cli_surface=surface,
             front_matter_path=Path(file_path),
-            voices_root=None,
+            voices_root=settings.voices_root,
         )
     deps = EditorDeps(
         file_path=Path(file_path),
@@ -151,7 +171,7 @@ async def edit_prose(
         tolerance=tolerance,
         audience=resolved,
     )
-    result = await _craft().editor(audience=resolved).run("Edit this prose.", deps=deps)
+    result = await _craft(settings).editor(audience=resolved).run("Edit this prose.", deps=deps)
     return result.output.model_dump(mode="json")
 
 
@@ -165,6 +185,7 @@ async def architect_prose(
     surface: str | None = None,
 ) -> dict[str, object]:
     """Opus-grade structural rewrite proposal. Returns ArchitectResult as JSON."""
+    settings = load_settings()
     resolved: ResolvedAudience | None = None
     if voice is not None:
         resolved = resolve_audience(
@@ -174,14 +195,16 @@ async def architect_prose(
             cli_dial=dial_ceiling,
             cli_surface=surface,
             front_matter_path=Path(file_path),
-            voices_root=None,
+            voices_root=settings.voices_root,
         )
     deps = ArchitectDeps(
         file_path=Path(file_path),
         voice_name=voice,
         audience=resolved,
     )
-    result = await _craft().architect(audience=resolved).run("Architect this prose.", deps=deps)
+    result = (
+        await _craft(settings).architect(audience=resolved).run("Architect this prose.", deps=deps)
+    )
     return result.output.model_dump(mode="json")
 
 
@@ -195,6 +218,7 @@ async def tune_diction(
     surface: str | None = None,
 ) -> dict[str, object]:
     """Focused word-choice pass. Returns SubstitutionPlan as JSON."""
+    settings = load_settings()
     resolved: ResolvedAudience | None = None
     if voice is not None:
         resolved = resolve_audience(
@@ -204,14 +228,14 @@ async def tune_diction(
             cli_dial=dial_ceiling,
             cli_surface=surface,
             front_matter_path=Path(file_path),
-            voices_root=None,
+            voices_root=settings.voices_root,
         )
     deps = TuneDeps(
         file_path=Path(file_path),
         voice_name=voice,
         audience=resolved,
     )
-    result = await _craft().tune_diction(audience=resolved).run("Tune diction.", deps=deps)
+    result = await _craft(settings).tune_diction(audience=resolved).run("Tune diction.", deps=deps)
     return result.output.model_dump(mode="json")
 
 
@@ -228,6 +252,7 @@ async def voice_compose_step(
     """One step of the composer wizard. Returns list[VoiceDelta] as JSON."""
     from prose_craft.orchestrator.deps import ComposerDeps
 
+    settings = load_settings()
     try:
         resolved = resolve_audience(
             name,
@@ -236,7 +261,7 @@ async def voice_compose_step(
             cli_dial=dial_ceiling,
             cli_surface=surface,
             front_matter_path=None,
-            voices_root=None,
+            voices_root=settings.voices_root,
         )
     except VoiceProfileNotFound:
         if any(value is not None for value in (audience, severity_ceiling, dial_ceiling, surface)):
@@ -248,14 +273,17 @@ async def voice_compose_step(
         profile=profile,
         audience=resolved,
     )
-    result = await _craft().voice_composer(audience=resolved).run("Compose step.", deps=deps)
+    result = (
+        await _craft(settings).voice_composer(audience=resolved).run("Compose step.", deps=deps)
+    )
     return [d.model_dump(mode="json") for d in result.output]
 
 
 @mcp.resource("prose://voices")
 async def list_voices_resource() -> str:
     """Markdown list of every voice under the active root."""
-    summaries = list_voices()
+    settings = load_settings()
+    summaries = list_voices(root=settings.voices_root)
     if not summaries:
         return "(no voices)"
     return "\n".join(f"- {s.name}  ({s.updated.isoformat()})" for s in summaries)
@@ -264,7 +292,8 @@ async def list_voices_resource() -> str:
 @mcp.resource("prose://voices/{name}")
 async def read_voice_resource(name: str) -> str:
     """Raw voice.md for the named voice, including front-matter + prose body."""
-    return read_voice_file(name)
+    settings = load_settings()
+    return read_voice_file(name, root=settings.voices_root)
 
 
 def run_stdio() -> None:

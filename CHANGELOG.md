@@ -6,11 +6,13 @@
 - Windows and macOS are now supported and tested platforms; CI runs the full suite on Linux, macOS, and Windows. `pyproject.toml` declares the corresponding `Operating System` classifiers.
 - Directory resolution honors the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/) on every platform, falling back to each platform's native convention when the XDG variables are unset. Five overrides — `PROSE_CRAFT_XDG_DATA_HOME`, `_CONFIG_HOME`, `_CACHE_HOME`, `_STATE_HOME`, `_RUNTIME_DIR` — take precedence over the corresponding `XDG_*` variables, which take precedence over the native default. A value that is empty or relative is ignored, as the specification requires.
 - `prose_craft.xdg` owns resolution; `prose_craft.paths` owns the layout. No other module reads an `XDG_*` variable.
+- Strict persistent configuration at the platform config root under `prose-craft/config.toml`, with CLI-over-environment-over-TOML precedence and non-overwriting `prose config --init` creation.
 
 ### Changed
 - Composer memory moved from `<voices_root>/.composer-state/` to the application state directory (`<state_root>/prose-craft/composer-state/`). It is agent state, not user data, and no longer sits inside the voice library. An orphaned `.composer-state/` left by an earlier version is inert and safe to delete.
 - `prose config` no longer writes `PROSE_CRAFT_MODEL` or `PROSE_CRAFT_VOICES_ROOT` into the process environment. The flags affect only what the command prints.
 - `platformdirs` is now a direct dependency. It was already present transitively, so no new package is installed.
+- Promoted `pydantic-settings[toml]` to a direct dependency for typed TOML and environment settings sources.
 - Plugin documentation refers to `<voices-root>` rather than `$XDG_DATA_HOME/prose-craft/voices`, which was only ever accurate on Linux. The voice-backup convention moved from inside the voices root to `<state-root>/prose-craft/backups/`.
 
 **No migration is required.** The voices root is unchanged on Linux and macOS.
@@ -23,6 +25,12 @@
 - `migrate voices` now discovers the newer `prose-voicecraft-prose-voicecraft` plugin-data directory in addition to the original `prose` directory. Users with the 17-voice discordian library cached under the new plugin name get the right source root on first migrate; previously the default pointed at an empty `prose/` dir and silently copied nothing.
 - `voice list` now surfaces broken voice files via `list_voice_errors` instead of silently dropping them from the count. A voice whose front-matter fails to parse against the current schema is reported to stderr (e.g. `error: new-voice: 3 validation errors for VoiceProfile ...`) so the user can see why a voice is missing from the list rather than seeing a quietly truncated count.
 - Two `migrate voices` tests asserted against the real user profile on Windows rather than a temporary directory, because they pinned `HOME` while `Path.home()` reads `USERPROFILE` there. They now pin both.
+- MCP `analyze_prose` now short-circuits on `metrics_only=True` regardless of the `voice` argument, matching the CLI's `analyze --metrics-only` guarantee; a broken TOML config file with `metrics_only=True --voice X` no longer fails with a configuration error.
+- `prose config --init` write-side failures (e.g. permission denied, fsync error) now report "could not write configuration at <path>" instead of "invalid configuration at <path>"; read-side wording is unchanged.
+- `prose config --init` parent-directory creation and `tempfile.mkstemp` failures (permission denied, ENOSPC) now flow through the same "could not write" wording as fsync/link failures and exit 2 without a traceback; previously they surfaced as bare `OSError`/`PermissionError` from outside the try/except boundary.
+- An empty or whitespace-only `model` in TOML, `PROSE_CRAFT_MODEL`, or an explicit `--model` flag is now rejected as `configuration error: model must not be empty` with the config file path; the analyzer no longer silently falls back to the built-in default when the override is empty.
+- `prose` voice commands now report invalid voice names (path-traversal attempts, whitespace, empty) as exit 2 with no traceback. The CLI's `_handle_errors` registers `VoiceNameError` alongside the other user-input exceptions, and `_voice_compose_repl` validates the name up front so a traversal attempt cannot pass through the silent template-initializer path.
+- Nested Typer wrappers now preserve the inner `typer.Exit(code)` instead of downgrading it. `voice refine` calls `voice compose` directly (not via the dispatcher), and the outer wrapper's generic `Exception` arm was masking the documented exit-2 by catching the inner `typer.Exit(2)` (a `RuntimeError` subclass) and re-raising `typer.Exit(1)` with a traceback. `_handle_errors` now propagates `typer.Exit` unchanged; a regression test sweeps the nested call with an invalid voice name and asserts the original exit code, no traceback, and the dedicated error message.
 
 ### Removed
 - Bundled-voice fallback in voice discovery: `get_bundled_voices_root()` and the wheel-side fallback in `read_voice` / `list_voices` are gone. Voices resolve against the user root only.

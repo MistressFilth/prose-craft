@@ -22,8 +22,7 @@ from prose_craft.agents.results import (
     SubstitutionPlan,
     VoiceDelta,
 )
-from prose_craft.config import get_model
-from prose_craft.paths import voices_root as _default_voices_root
+from prose_craft.config import load_settings
 from prose_craft.orchestrator.deps import (
     AnalysisDeps,
     ArchitectDeps,
@@ -44,23 +43,8 @@ __all__ = ["ProseCraft"]
 # subtype of the bare `Agent` class. The cache assignment and the
 # per-accessor return types are what keep callers honest; the type
 # ignores on the cache boundary document the upcast from `T` to `Agent`.
-# TODO(whole-branch-review): Each agent should expose the deterministic
-# primitives as tools per the spec's Agent Contracts table. The current
-# implementation gives every agent only `read_file`. Decide between:
-# (a) wrapping the analysis primitives as per-agent tools and rewriting
-# the per-agent tests, or (b) amending the spec to "model handles analysis
-# in-context." Defer the decision to the user; do not pick arbitrarily.
 
 T = TypeVar("T")
-
-# Per-line `# type: ignore[import-untyped]` comments on the seven
-# `from prose_craft.agents.<x> import build_<x>` statements below are
-# TEMPORARY: the `prose_craft.agents.*` package and its factories do not
-# exist yet on this branch (Tasks 22-29 land them). Remove every
-# `# type: ignore[import-untyped]` in this file as part of the PR that
-# introduces the matching agent module. Until then, the inline imports
-# remain correct, the cache key still works, and the test injects the
-# factory via `sys.modules` so we can exercise the lazy path.
 
 
 class ProseCraft:
@@ -73,8 +57,17 @@ class ProseCraft:
         voices_root: Path | None = None,
         log_level: str = "INFO",
     ) -> None:
-        self.model = model or get_model()
-        self.voices_root = (voices_root or _default_voices_root()).resolve()
+        # One settings load covers any omitted value. Explicit kwargs win
+        # individually: passing voices_root= preserves it while model still
+        # falls through to env/TOML/defaults, and vice versa. Both
+        # explicit bypasses config parsing entirely, so a broken TOML
+        # cannot poison a fully-specified caller.
+        if model is None or voices_root is None:
+            settings = load_settings(model=model, voices_root=voices_root)
+            model = settings.model
+            voices_root = settings.voices_root
+        self.model = model
+        self.voices_root = voices_root.resolve()
         self.log_level = log_level
         self._agents: dict[str, Agent] = {}
 

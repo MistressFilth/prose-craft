@@ -52,8 +52,8 @@ def run_voice_check_tool(
 ) -> str:
     """Run the deterministic voice checker against ``text``.
 
-    Loads the named ``VoiceProfile`` from the standard voice root
-    (``prose_craft.paths.voices_root()``) and returns the
+    Loads the named ``VoiceProfile`` from the configured voice root
+    (via :func:`prose_craft.config.load_settings`) and returns the
     JSON-serialized ``VoiceVerdict``.
 
     The agent decides whether to layer model-judged entries on top; this

@@ -1,6 +1,6 @@
 [project]
 name = "prose-craft"
-version = "0.4.0"
+version = "0.5.0"
 description = "pydantic-ai engine for designing and applying prose voices"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,6 +19,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     "python-frontmatter>=1.1.0",
     "pydantic>=2.0",
+    "pydantic-settings[toml]>=2.14.2,<3",
     "platformdirs>=4.0",
 ]
 

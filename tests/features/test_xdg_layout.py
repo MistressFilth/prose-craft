@@ -47,7 +47,7 @@ def test_voices_root_holds_no_dot_directories(tmp_path: Path) -> None:
     result = runner.invoke(app, ["voice", "init", "layout-probe"])
     assert result.exit_code == 0, result.output
 
-    root = paths.voices_root()
+    root = paths.default_voices_root()
     assert [p.name for p in root.iterdir() if p.name.startswith(".")] == []
 
 
@@ -111,7 +111,7 @@ def test_composer_state_is_not_in_the_voices_root(tmp_path: Path) -> None:
     runner.invoke(app, ["voice", "init", "layout-probe"])
 
     composer = paths.composer_state_dir()
-    voices = paths.voices_root()
+    voices = paths.default_voices_root()
     assert voices not in composer.parents
 
 

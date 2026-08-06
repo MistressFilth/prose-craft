@@ -20,9 +20,9 @@ them was to keep agent memory out of the voice library, and
 ``list_voices()`` globs ``<voices_root>/*/voice.md``, which never
 matches a sibling.
 
-``PROSE_CRAFT_VOICES_ROOT`` is read here rather than in ``xdg`` because
-it names an application directory outright, not a root. It wins over
-the resolution chain; ``--voices-root`` is its per-invocation
+The voices root honors ``PROSE_CRAFT_VOICES_ROOT`` and the XDG config
+chain through :mod:`prose_craft.config`; this module only owns the
+XDG-derived default. ``--voices-root`` is the per-invocation
 equivalent.
 """
 
@@ -41,8 +41,8 @@ __all__ = [
     "app_runtime_dir",
     "app_state_dir",
     "composer_state_dir",
+    "default_voices_root",
     "scratch_dir",
-    "voices_root",
 ]
 
 
@@ -82,16 +82,8 @@ def app_runtime_dir() -> Path:
     return path
 
 
-def voices_root() -> Path:
-    """The voice profile store.
-
-    ``PROSE_CRAFT_VOICES_ROOT`` if it names an absolute path, otherwise
-    ``<data_root>/prose-craft/voices``. Not created; ``write_voice``
-    creates it on demand.
-    """
-    explicit = xdg.env_path("PROSE_CRAFT_VOICES_ROOT")
-    if explicit is not None:
-        return explicit
+def default_voices_root() -> Path:
+    """Return the XDG-derived default voice profile store without creating it."""
     return app_data_dir() / "voices"
 
 

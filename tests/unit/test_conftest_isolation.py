@@ -20,8 +20,8 @@ def test_roots_are_redirected_into_tmp_path(tmp_path: Path) -> None:
         assert str(resolver()).startswith(str(tmp_path)), resolver.__name__
 
 
-def test_voices_root_is_redirected(tmp_path: Path) -> None:
-    assert str(paths.voices_root()).startswith(str(tmp_path))
+def test_default_voices_root_is_redirected(tmp_path: Path) -> None:
+    assert str(paths.default_voices_root()).startswith(str(tmp_path))
 
 
 def test_ambient_values_are_cleared() -> None:

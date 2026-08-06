@@ -3,7 +3,8 @@
 Subcommands:
 
 * ``version`` — print the engine version and exit.
-* ``config`` — print the active model and voices root.
+* ``config`` — print the config file path and the effective model and
+  voices root, or initialize a new config file with ``--init``.
 * ``voice list`` — enumerate every voice under the active root.
 * ``voice show`` — print a voice profile (markdown rendering or raw file).
 * ``analyze`` — run the analyst agent (or deterministic metrics only).
@@ -33,6 +34,7 @@ import sys
 import traceback
 from typing import Any, Literal
 
+import click
 import typer
 from pydantic_ai import ModelRetry, UsageLimitExceeded
 from rich.console import Console
@@ -40,8 +42,13 @@ from rich.markdown import Markdown
 
 from prose_craft import __version__
 from prose_craft.agents.results import VoiceDelta
-from prose_craft.config import get_model
-from prose_craft.paths import voices_root as _default_voices_root
+from prose_craft.config import (
+    ConfigurationError,
+    ProseCraftSettings,
+    config_file,
+    initialize_config,
+    load_settings,
+)
 from prose_craft.orchestrator.root import ProseCraft
 from prose_craft.voices.audience import AudienceNotFoundError
 from prose_craft.voices.io import (
@@ -51,7 +58,7 @@ from prose_craft.voices.io import (
     read_voice_raw,
     write_voice,
 )
-from prose_craft.voices.location import voice_path
+from prose_craft.voices.location import VoiceNameError, voice_path
 from prose_craft.voices.model import (
     AudienceCeiling,
     AudiencesBlock,
@@ -73,6 +80,24 @@ app = typer.Typer(
 console = Console()
 
 
+def _settings(
+    *,
+    model: str | None = None,
+    voices_root: Path | None = None,
+) -> ProseCraftSettings:
+    """Build effective settings from CLI overrides.
+
+    Each call constructs a fresh :class:`ProseCraftSettings` so failures
+    surface cleanly. Explicit arguments win; everything else is read
+    from the XDG config file and the environment via the precedence
+    chain implemented in :func:`prose_craft.config.load_settings`.
+    """
+    return load_settings(
+        model=model,
+        voices_root=voices_root.resolve() if voices_root is not None else None,
+    )
+
+
 def _handle_errors(func: Any) -> Any:
     """Render the CLI's documented exception classes consistently."""
 
@@ -80,6 +105,12 @@ def _handle_errors(func: Any) -> Any:
     def wrapped(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
+        except typer.Exit:
+            # Propagate Exit unchanged so a subcommand that calls another
+            # Typer-wrapped command (``voice_refine`` → ``voice_compose``)
+            # does not downgrade the inner exit code through the generic
+            # ``Exception`` arm.
+            raise
         except (ModelRetry, UsageLimitExceeded) as exc:
             typer.echo(str(exc), err=True)
             raise typer.Exit(code=1) from exc
@@ -87,7 +118,29 @@ def _handle_errors(func: Any) -> Any:
             typer.echo(str(exc), err=True)
             typer.echo("Run `prose voice list` to see available voices.", err=True)
             raise typer.Exit(code=2) from exc
+        except VoiceNameError as exc:
+            # Path-traversal attempts and other invalid voice names reach
+            # here from ``voice_path`` via ``read_voice`` /
+            # ``read_voice_raw`` / ``write_voice``. ``ValueError`` parents
+            # include it, but the handler is registered explicitly so the
+            # message lands once on stderr with no traceback and the exit
+            # code is 2 — a documented user-input error, not a crash.
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from exc
         except AudienceNotFoundError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from exc
+        except ConfigurationError as exc:
+            typer.echo(f"configuration error: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+        except (typer.BadParameter, click.UsageError) as exc:
+            # Parameter conflicts (``--init`` + ``--model``, etc.) and
+            # any other user-facing argument validation errors must not
+            # print a traceback. ``typer.BadParameter`` and
+            # ``click.UsageError`` are sibling class hierarchies
+            # (typer's exceptions live in ``typer._click.exceptions``);
+            # catching both keeps the handler robust whichever one a
+            # given command raises.
             typer.echo(str(exc), err=True)
             raise typer.Exit(code=2) from exc
         except Exception:
@@ -102,10 +155,16 @@ app.add_typer(voice_app, name="voice")
 
 
 def _voices_root_opt(root: Path | None) -> Path:
-    """Return the active voices root, honoring a CLI override."""
+    """Return the configured voices root, honoring a CLI override.
+
+    The override is resolved to an absolute path so the printed value
+    matches what the rest of the run will see — a relative
+    ``--voices-root`` would otherwise compare unequal under
+    ``voice list`` (which uses the resolved path).
+    """
     if root is not None:
         return root.resolve()
-    return _default_voices_root()
+    return load_settings().voices_root
 
 
 @app.command()
@@ -118,14 +177,30 @@ def version() -> None:
 @app.command()
 @_handle_errors
 def config(
+    init: bool = typer.Option(False, "--init", help="Create the configuration file."),
     model: str | None = typer.Option(None, "--model", help="Override the model."),
     voices_root: Path | None = typer.Option(
-        None, "--voices-root", help="Override the voices root."
+        None,
+        "--voices-root",
+        help="Override the voices root.",
     ),
 ) -> None:
-    """Print the active model and voices root."""
-    typer.echo(f"model: {model or get_model()}")
-    typer.echo(f"voices_root: {_voices_root_opt(voices_root)}")
+    """Print the config file path and effective values.
+
+    With ``--init``, create the XDG config file with built-in defaults
+    and exit. ``--init`` is mutually exclusive with ``--model`` and
+    ``--voices-root`` so callers cannot silently capture a one-shot
+    override into persistent storage.
+    """
+    if init:
+        if model is not None or voices_root is not None:
+            raise typer.BadParameter("--init cannot be combined with --model or --voices-root")
+        typer.echo(f"created: {initialize_config()}")
+        return
+    effective = _settings(model=model, voices_root=voices_root)
+    typer.echo(f"config_file: {config_file()}")
+    typer.echo(f"model: {effective.model}")
+    typer.echo(f"voices_root: {effective.voices_root}")
 
 
 @voice_app.command("list")
@@ -238,7 +313,8 @@ def analyze(
         diag = ProseDiagnostic.model_validate({"metrics": m, "issues": []})
         typer.echo(_render_prose_diagnostic(diag))
         return
-    craft = ProseCraft()
+    settings = _settings()
+    craft = ProseCraft(model=settings.model, voices_root=settings.voices_root)
     result = craft.analyst().run_sync(
         "Analyze this prose.",
         deps=AnalysisDeps(
@@ -263,7 +339,8 @@ def edit(
     """Run the editor agent; print the change_log and the new text."""
     from prose_craft.orchestrator.deps import EditorDeps
 
-    craft = ProseCraft()
+    settings = _settings()
+    craft = ProseCraft(model=settings.model, voices_root=settings.voices_root)
     result = craft.editor().run_sync(
         "Edit this prose.",
         deps=EditorDeps(
@@ -289,7 +366,8 @@ def architect(
     """Run the architect agent; print the reconstruction proposal."""
     from prose_craft.orchestrator.deps import ArchitectDeps
 
-    craft = ProseCraft()
+    settings = _settings()
+    craft = ProseCraft(model=settings.model, voices_root=settings.voices_root)
     result = craft.architect().run_sync(
         "Architect this prose.",
         deps=ArchitectDeps(file_path=file, voice_name=voice),
@@ -308,7 +386,8 @@ def tune_dict(
     """Run the tune-diction agent; print the substitution plan."""
     from prose_craft.orchestrator.deps import TuneDeps
 
-    craft = ProseCraft()
+    settings = _settings()
+    craft = ProseCraft(model=settings.model, voices_root=settings.voices_root)
     result = craft.tune_diction().run_sync(
         "Tune diction.",
         deps=TuneDeps(file_path=file, voice_name=voice),
@@ -461,7 +540,7 @@ def _apply_delta(payload: dict[str, Any], delta: VoiceDelta) -> None:
         payload[delta.field] = delta.value
 
 
-def _voice_compose_repl(name: str, root: Path) -> None:
+def _voice_compose_repl(name: str, root: Path, model: str) -> None:
     """Walk a writer through composing a voice, one dimension at a time."""
     from datetime import date
 
@@ -477,9 +556,16 @@ def _voice_compose_repl(name: str, root: Path) -> None:
         VoiceProfile,
     )
 
+    # Validate the name up front: ``voice_path`` raises ``VoiceNameError``
+    # for empty / whitespace / path-traversal names and the CLI handler
+    # surfaces that as exit 2 with no traceback. Without this guard the
+    # blanket ``except Exception`` below would silently swallow the error
+    # and proceed to construct an agent against an invalid name.
+    voice_path(name, root=root)
+
     try:
         profile, body = read_voice_raw(name, root=root)
-    except Exception:
+    except VoiceProfileNotFound:
         # Initialize from template.
         body = load_template()
         body = body.replace("<name>", name).replace("<voice-name>", name)
@@ -508,7 +594,7 @@ def _voice_compose_repl(name: str, root: Path) -> None:
         "never",
     ]
     field_index = 0
-    craft = ProseCraft(voices_root=root)
+    craft = ProseCraft(model=model, voices_root=root)
     agent = craft.voice_composer()
 
     while field_index < len(fields):
@@ -552,8 +638,8 @@ def voice_compose(
     voices_root: Path | None = typer.Option(None, "--voices-root"),
 ) -> None:
     """Interactive REPL: walk the writer through composing a voice."""
-    root = _voices_root_opt(voices_root)
-    _voice_compose_repl(name, root)
+    settings = _settings(voices_root=voices_root)
+    _voice_compose_repl(name, settings.voices_root, settings.model)
 
 
 @voice_app.command("refine")
@@ -609,7 +695,8 @@ def voice_draft(
     from prose_craft.paths import scratch_dir
     from prose_craft.voices.audience import resolve_audience
 
-    root = _voices_root_opt(voices_root)  # honor the override for env consistency
+    settings = _settings(voices_root=voices_root)
+    root = settings.voices_root  # honor the override for env consistency
     # The stylist reads/writes the target file. The CLI seeds an empty
     # file at --to if given; the agent writes into it. Without --to we
     # use a scratch file under the runtime dir and remove it after.
@@ -637,7 +724,7 @@ def voice_draft(
         for w in resolved.warnings if resolved else []:
             typer.echo(f"warning: {w}", err=True)
 
-        craft = ProseCraft(voices_root=root)
+        craft = ProseCraft(model=settings.model, voices_root=root)
         result = craft.voice_stylist(audience=resolved).run_sync(
             f"Draft prose in voice {name!r}. Brief: {brief}",
             deps=StylistDeps(
@@ -687,7 +774,8 @@ def voice_edit(
     from prose_craft.orchestrator.deps import StylistDeps
     from prose_craft.voices.audience import resolve_audience
 
-    root = _voices_root_opt(voices_root)  # validate root exists
+    settings = _settings(voices_root=voices_root)
+    root = settings.voices_root  # validate root exists
 
     resolved = resolve_audience(
         voice,
@@ -701,7 +789,7 @@ def voice_edit(
     for w in resolved.warnings if resolved else []:
         typer.echo(f"warning: {w}", err=True)
 
-    craft = ProseCraft(voices_root=root)
+    craft = ProseCraft(model=settings.model, voices_root=root)
     result = craft.voice_stylist(audience=resolved).run_sync(
         "Edit this prose in the named voice.",
         deps=StylistDeps(

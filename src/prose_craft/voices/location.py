@@ -1,6 +1,6 @@
 """Voice profile naming and path construction.
 
-Root resolution lives in :mod:`prose_craft.paths`; this module owns
+Root resolution lives in :mod:`prose_craft.config`; this module owns
 only the name grammar and the ``<root>/<name>/voice.md`` layout.
 """
 
@@ -21,13 +21,14 @@ def voice_path(name: str, *, root: Path | None = None) -> Path:
 
     Voice names must match ``^[a-zA-Z][a-zA-Z0-9-]*$``. Invalid names,
     including path-traversal attempts, raise :class:`VoiceNameError`.
-    A ``root`` of ``None`` resolves to
-    :func:`prose_craft.paths.voices_root`.
+    A ``root`` of ``None`` resolves to the configured voices root via
+    :func:`prose_craft.config.load_settings` (deferred import to avoid
+    a module cycle).
     """
     if _NAME_RE.fullmatch(name) is None:
         raise VoiceNameError(f"invalid voice name {name!r}: must match [a-zA-Z][a-zA-Z0-9-]*")
     if root is None:
-        from prose_craft.paths import voices_root
+        from prose_craft.config import load_settings
 
-        root = voices_root()
+        root = load_settings().voices_root
     return root / name / "voice.md"
