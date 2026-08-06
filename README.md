@@ -97,6 +97,45 @@ XDG_DATA_HOME=/mnt/voices prose voice list
 
 A value that is empty or relative is ignored, per the specification.
 
+### Persistent settings
+
+Create a TOML config file at the platform config root to set values that
+survive across invocations:
+
+| | Linux | macOS | Windows |
+|---|---|---|---|
+| Config | `~/.config/prose-craft/config.toml` | `~/Library/Application Support/prose-craft/config.toml` | `%LOCALAPPDATA%\prose-craft\config.toml` |
+
+The file accepts two fields today. Values are typed strictly — unknown keys,
+wrong-typed values, empty or relative paths, and malformed TOML all surface
+as a `configuration error` naming the offending file:
+
+```toml
+model = "anthropic:claude-opus-4-5"
+
+[paths]
+voices_root = "/absolute/path/to/voices"
+```
+
+`paths.voices_root` is expanded against `~` and must be absolute; a relative
+value is rejected. Run `prose config --init` to write the built-in defaults
+to the platform config root — the operation refuses to overwrite an existing
+file and exits 2 instead, leaving your edits untouched.
+
+Precedence is exactly four layers, highest wins:
+
+```text
+CLI option > PROSE_CRAFT_* environment variable > config.toml > built-in/XDG default
+```
+
+So `--model` / `--voices-root` win for a single invocation, `PROSE_CRAFT_MODEL`
+and `PROSE_CRAFT_VOICES_ROOT` win for a session, the TOML file wins for a
+machine, and the XDG default is the fallback.
+
+The `version` command is intentionally independent of the config file —
+`prose version` still prints the package version when the TOML is broken or
+missing, so you always have a way to diagnose which version is installed.
+
 `PROSE_CRAFT_VOICES_ROOT` names the voices directory outright and wins over all
 of the above; `--voices-root` is its per-invocation equivalent.
 
