@@ -10,7 +10,16 @@ import pytest
 from pydantic_ai import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
+from prose_craft.config import config_file
 from prose_craft.orchestrator.root import ProseCraft
+
+
+def _write_config(text: str) -> Path:
+    """Write ``text`` to the test's XDG config.toml and return the path."""
+    path = config_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
 
 
 def _stub_response(content: str):
@@ -27,6 +36,28 @@ def test_prose_craft_constructs_with_defaults(
     craft = ProseCraft()
     assert craft.model == "anthropic:claude-opus-4-5"
     assert str(craft.voices_root).endswith("test-voices")
+
+
+def test_constructor_loads_toml_defaults(tmp_path: Path) -> None:
+    """A TOML config populates model + voices_root when no kwargs are given."""
+    configured = tmp_path / "voices"
+    _write_config(f'model = "anthropic:test"\n\n[paths]\nvoices_root = "{configured.as_posix()}"\n')
+
+    craft = ProseCraft()
+
+    assert craft.model == "anthropic:test"
+    assert craft.voices_root == configured
+
+
+def test_explicit_constructor_ignores_malformed_config(tmp_path: Path) -> None:
+    """All kwargs set explicitly bypass config parsing — broken TOML is irrelevant."""
+    _write_config('model = "unterminated\n')
+    explicit = tmp_path / "voices"
+
+    craft = ProseCraft(model="anthropic:explicit", voices_root=explicit)
+
+    assert craft.model == "anthropic:explicit"
+    assert craft.voices_root == explicit.resolve()
 
 
 def test_prose_craft_lazy_build(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

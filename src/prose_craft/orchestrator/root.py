@@ -22,7 +22,7 @@ from prose_craft.agents.results import (
     SubstitutionPlan,
     VoiceDelta,
 )
-from prose_craft.config import get_model, load_settings
+from prose_craft.config import load_settings
 from prose_craft.orchestrator.deps import (
     AnalysisDeps,
     ArchitectDeps,
@@ -72,8 +72,17 @@ class ProseCraft:
         voices_root: Path | None = None,
         log_level: str = "INFO",
     ) -> None:
-        self.model = model or get_model()
-        self.voices_root = (voices_root or load_settings().voices_root).resolve()
+        # One settings load covers any omitted value. Explicit kwargs win
+        # individually: passing voices_root= preserves it while model still
+        # falls through to env/TOML/defaults, and vice versa. Both
+        # explicit bypasses config parsing entirely, so a broken TOML
+        # cannot poison a fully-specified caller.
+        if model is None or voices_root is None:
+            settings = load_settings(model=model, voices_root=voices_root)
+            model = settings.model
+            voices_root = settings.voices_root
+        self.model = model
+        self.voices_root = voices_root.resolve()
         self.log_level = log_level
         self._agents: dict[str, Agent] = {}
 
