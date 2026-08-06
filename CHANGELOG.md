@@ -19,6 +19,7 @@
 
 ### Fixed
 - `prose voice draft` without `--to` no longer leaves a stray `.md` file in the system temp directory. The scratch file is created under the runtime directory and removed when the command finishes, including on failure.
+- The unbound `write_voice` tool in `prose_craft.agents.tools` now pins `root=` to `load_settings().voices_root` explicitly. A future change that introduces shared-root walking in `voice_path` / `_io_write_voice` would otherwise have let any agent that wires the unbound tool silently overwrite a system-installed voice.
 - Scratch files no longer fail outright when `XDG_RUNTIME_DIR` is exported but unusable — common under WSL, in containers, and in ssh sessions without a login session. The runtime root falls back to `<state_root>/prose-craft/run/`, which the specification sanctions.
 - An unset `HOME` no longer resolves the voices root to a path relative to the current working directory.
 - A relative value in `XDG_DATA_HOME` is now ignored instead of being resolved against the current working directory.
