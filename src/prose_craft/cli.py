@@ -58,7 +58,7 @@ from prose_craft.voices.io import (
     read_voice_raw,
     write_voice,
 )
-from prose_craft.voices.location import voice_path
+from prose_craft.voices.location import VoiceNameError, voice_path
 from prose_craft.voices.model import (
     AudienceCeiling,
     AudiencesBlock,
@@ -105,12 +105,27 @@ def _handle_errors(func: Any) -> Any:
     def wrapped(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
+        except typer.Exit:
+            # Propagate Exit unchanged so a subcommand that calls another
+            # Typer-wrapped command (``voice_refine`` → ``voice_compose``)
+            # does not downgrade the inner exit code through the generic
+            # ``Exception`` arm.
+            raise
         except (ModelRetry, UsageLimitExceeded) as exc:
             typer.echo(str(exc), err=True)
             raise typer.Exit(code=1) from exc
         except VoiceProfileNotFound as exc:
             typer.echo(str(exc), err=True)
             typer.echo("Run `prose voice list` to see available voices.", err=True)
+            raise typer.Exit(code=2) from exc
+        except VoiceNameError as exc:
+            # Path-traversal attempts and other invalid voice names reach
+            # here from ``voice_path`` via ``read_voice`` /
+            # ``read_voice_raw`` / ``write_voice``. ``ValueError`` parents
+            # include it, but the handler is registered explicitly so the
+            # message lands once on stderr with no traceback and the exit
+            # code is 2 — a documented user-input error, not a crash.
+            typer.echo(str(exc), err=True)
             raise typer.Exit(code=2) from exc
         except AudienceNotFoundError as exc:
             typer.echo(str(exc), err=True)
@@ -541,9 +556,16 @@ def _voice_compose_repl(name: str, root: Path, model: str) -> None:
         VoiceProfile,
     )
 
+    # Validate the name up front: ``voice_path`` raises ``VoiceNameError``
+    # for empty / whitespace / path-traversal names and the CLI handler
+    # surfaces that as exit 2 with no traceback. Without this guard the
+    # blanket ``except Exception`` below would silently swallow the error
+    # and proceed to construct an agent against an invalid name.
+    voice_path(name, root=root)
+
     try:
         profile, body = read_voice_raw(name, root=root)
-    except Exception:
+    except VoiceProfileNotFound:
         # Initialize from template.
         body = load_template()
         body = body.replace("<name>", name).replace("<voice-name>", name)

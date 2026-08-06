@@ -116,6 +116,23 @@ class ProseCraftSettings(BaseSettings):
     model: str = DEFAULT_MODEL
     paths: PathsSettings = Field(default_factory=PathsSettings)
 
+    @field_validator("model", mode="before")
+    @classmethod
+    def _validate_model(cls, value: object) -> object:
+        """Reject an empty or whitespace-only model from any source.
+
+        A bare default would silently mask an explicit-but-broken override
+        ("I set PROSE_CRAFT_MODEL and prose is using the default — why?");
+        every source that produces a model string — TOML, environment,
+        explicit kwargs — runs through the same validator so the failure
+        mode is uniform. Whitespace inside the string is preserved.
+        """
+        if not isinstance(value, str):
+            return value
+        if not value.strip():
+            raise ValueError("model must not be empty or whitespace-only")
+        return value
+
     @property
     def voices_root(self) -> Path:
         """Effective voices directory: configured or XDG default."""
@@ -257,13 +274,22 @@ def _cast_settings_kwargs(values: dict[str, object]) -> Any:
 def serialize_config(model: str, voices_root: Path) -> str:
     """Render the configuration file body for ``(model, voices_root)``.
 
-    ``json.dumps`` produces a TOML basic string literal that is also a
-    valid JSON string literal — escapes for backslashes, control
-    characters, and the delimiter double-quote, with no surface area
-    for ``\\b`` to read as a TOML escape sequence. This keeps Windows
-    backslashes safe while staying readable on POSIX.
+    ``json.dumps(..., ensure_ascii=False)`` produces a TOML basic string
+    literal that is also a valid JSON string literal — escapes for
+    backslashes, control characters, and the delimiter double-quote,
+    with the actual UTF-8 bytes preserved for non-ASCII content.
+
+    The non-default ``ensure_ascii=False`` is load-bearing: with
+    ``ensure_ascii=True`` (the default), ``json.dumps`` encodes any
+    non-ASCII code point as a UTF-16 surrogate pair (``\\uD83C\\uDF89``
+    for U+1F389 🎉); TOML basic strings reject lone surrogates. The
+    TOML spec mandates UTF-8 input, so writing the raw bytes is both
+    safe and more readable than a hex-escape sequence.
     """
-    return f"model = {json.dumps(model)}\n\n[paths]\nvoices_root = {json.dumps(str(voices_root))}\n"
+    return (
+        f"model = {json.dumps(model, ensure_ascii=False)}\n\n"
+        f"[paths]\nvoices_root = {json.dumps(str(voices_root), ensure_ascii=False)}\n"
+    )
 
 
 def initialize_config() -> Path:
@@ -273,19 +299,30 @@ def initialize_config() -> Path:
     and leaves the file untouched (it is not parsed). Publication is atomic
     via ``os.link`` so a reader either sees no file or the fully-written
     file — never a half-written one.
+
+    Every step that touches the filesystem runs inside the ``try/except``
+    boundary so a permission error at ``mkdir`` or ``mkstemp`` surfaces as
+    :class:`ConfigurationError` carrying ``kind="could not write"`` and the
+    CLI handler can exit 2 cleanly without printing a traceback.
     """
     target = config_file()
     if target.exists():
         raise ConfigAlreadyExists(target)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary_name = tempfile.mkstemp(
-        prefix=f".{target.name}.",
-        suffix=".tmp",
-        dir=target.parent,
-    )
-    temporary = Path(temporary_name)
-    descriptor_open = True
+    fd = -1
+    temporary: Path | None = None
+    descriptor_open = False
     try:
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            fd, temporary_name = tempfile.mkstemp(
+                prefix=f".{target.name}.",
+                suffix=".tmp",
+                dir=target.parent,
+            )
+        except OSError as exc:
+            raise ConfigurationError(target, str(exc), kind="could not write") from exc
+        temporary = Path(temporary_name)
+        descriptor_open = True
         payload = serialize_config(DEFAULT_MODEL, default_voices_root())
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
             descriptor_open = False
@@ -304,4 +341,5 @@ def initialize_config() -> Path:
     finally:
         if descriptor_open:
             os.close(fd)
-        temporary.unlink(missing_ok=True)
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)

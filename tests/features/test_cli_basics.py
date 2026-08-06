@@ -58,10 +58,53 @@ def test_voice_list_empty(monkeypatch, tmp_path) -> None:
 
 
 def test_voice_show_raw_rejects_path_traversal(monkeypatch, tmp_path) -> None:
+    """Path traversal in the voice name exits 2 with no traceback.
+
+    Regression: ``VoiceNameError`` is a documented user-input error, not
+    an internal crash. The CLI's :func:`_handle_errors` catches it
+    alongside ``VoiceProfileNotFound`` so the user sees a one-line
+    message instead of a traceback.
+    """
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
     result = runner.invoke(app, ["voice", "show", "../../etc/passwd", "--raw"])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "invalid voice name" in result.output
+    assert "Traceback" not in result.output
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["voice", "show", "../escape"],
+        ["voice", "show", "../escape", "--raw"],
+        ["voice", "show", "name with spaces"],
+        ["voice", "show", ""],
+        ["voice", "init", "../escape"],
+        ["voice", "init", "name with spaces"],
+        ["voice", "compose", "../escape"],
+        ["voice", "refine", "../escape"],
+        ["voice", "check", "draft.md", "--voice", "../escape"],
+        ["voice", "edit", "draft.md", "--voice", "../escape"],
+    ],
+)
+def test_voice_subcommands_reject_invalid_name_without_traceback(
+    monkeypatch, tmp_path: Path, args: list[str]
+) -> None:
+    """Every voice subcommand surfaces :class:`VoiceNameError` as exit 2.
+
+    Strengthens the original traversal test: rather than exercising one
+    code path, it sweeps the documented subcommands that touch
+    ``voice_path`` (``read_voice`` / ``read_voice_raw`` / ``write_voice``)
+    to make sure the new exception arm in :func:`_handle_errors` covers
+    all of them. A failure here means a subcommand silently regressed to
+    the generic ``Exception`` arm and prints a traceback.
+    """
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    if "draft.md" in args:
+        (tmp_path / "draft.md").write_text("hello world", encoding="utf-8")
+    result = runner.invoke(app, args)
+    assert result.exit_code == 2, result.output
+    assert "Traceback" not in result.output
 
 
 class _FailingAgent:
@@ -193,6 +236,78 @@ def test_config_init_rejects_combined_overrides() -> None:
     assert result.exit_code == 2
     assert "--init" in result.output
     assert "cannot be combined" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_config_init_mkdir_failure_exits_two_without_traceback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Write-side OSError must surface as a clean exit-2 with no traceback.
+
+    Previously the ``mkdir`` ran outside the OSError boundary and a
+    ``PermissionError`` reached the generic ``Exception`` arm of the CLI
+    error handler, which prints a traceback and exits 1. The fix moves
+    ``mkdir`` and ``mkstemp`` inside the boundary so the user sees the
+    same ``configuration error: could not write`` wording as a fsync or
+    link failure.
+    """
+    target = config_file()
+
+    def fail_mkdir(*_args: object, **_kwargs: object) -> None:
+        raise PermissionError(13, "Permission denied", str(target.parent))
+
+    monkeypatch.setattr(Path, "mkdir", fail_mkdir)
+
+    result = runner.invoke(app, ["config", "--init"])
+
+    assert result.exit_code == 2, result.output
+    assert "could not write" in result.output
+    assert "configuration error" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_config_init_mkstemp_failure_exits_two_without_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ENOSPC at ``mkstemp`` must surface as a clean exit-2 with no traceback."""
+    import tempfile as _tempfile
+
+    def fail_mkstemp(**_kwargs: object) -> tuple[int, str]:
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(_tempfile, "mkstemp", fail_mkstemp)
+
+    result = runner.invoke(app, ["config", "--init"])
+
+    assert result.exit_code == 2, result.output
+    assert "could not write" in result.output
+    assert "No space left on device" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_config_rejects_empty_model_flag_without_traceback() -> None:
+    """``prose config --model ""`` exits 2 without a traceback.
+
+    The schema rejects an empty/whitespace-only model so a user who
+    forgot to fill in the value sees a one-line message instead of the
+    analyzer silently falling back to the default. The CLI must surface
+    this as a clean configuration error.
+    """
+    result = runner.invoke(app, ["config", "--model", ""])
+
+    assert result.exit_code == 2, result.output
+    assert "configuration error" in result.output
+    assert "model must not be empty" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_config_rejects_whitespace_model_flag_without_traceback() -> None:
+    """``prose config --model "   "`` exits 2 without a traceback."""
+    result = runner.invoke(app, ["config", "--model", "   "])
+
+    assert result.exit_code == 2, result.output
+    assert "configuration error" in result.output
+    assert "model must not be empty" in result.output
     assert "Traceback" not in result.output
 
 

@@ -27,6 +27,9 @@
 - Two `migrate voices` tests asserted against the real user profile on Windows rather than a temporary directory, because they pinned `HOME` while `Path.home()` reads `USERPROFILE` there. They now pin both.
 - MCP `analyze_prose` now short-circuits on `metrics_only=True` regardless of the `voice` argument, matching the CLI's `analyze --metrics-only` guarantee; a broken TOML config file with `metrics_only=True --voice X` no longer fails with a configuration error.
 - `prose config --init` write-side failures (e.g. permission denied, fsync error) now report "could not write configuration at <path>" instead of "invalid configuration at <path>"; read-side wording is unchanged.
+- `prose config --init` parent-directory creation and `tempfile.mkstemp` failures (permission denied, ENOSPC) now flow through the same "could not write" wording as fsync/link failures and exit 2 without a traceback; previously they surfaced as bare `OSError`/`PermissionError` from outside the try/except boundary.
+- An empty or whitespace-only `model` in TOML, `PROSE_CRAFT_MODEL`, or an explicit `--model` flag is now rejected as `configuration error: model must not be empty` with the config file path; the analyzer no longer silently falls back to the built-in default when the override is empty.
+- `prose` voice commands now report invalid voice names (path-traversal attempts, whitespace, empty) as exit 2 with no traceback. The CLI's `_handle_errors` registers `VoiceNameError` alongside the other user-input exceptions, and `_voice_compose_repl` validates the name up front so a traversal attempt cannot pass through the silent template-initializer path.
 
 ### Removed
 - Bundled-voice fallback in voice discovery: `get_bundled_voices_root()` and the wheel-side fallback in `read_voice` / `list_voices` are gone. Voices resolve against the user root only.
