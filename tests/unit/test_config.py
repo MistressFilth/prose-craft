@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
+import json
+import os
+from os import PathLike
 from pathlib import Path
 
 import pytest
 
 from prose_craft.config import (
     DEFAULT_MODEL,
+    ConfigAlreadyExists,
     ConfigurationError,
     PathsSettings,
     ProseCraftSettings,
     config_file,
     get_model,
+    initialize_config,
     load_settings,
+    serialize_config,
 )
 from prose_craft.paths import default_voices_root
 
@@ -86,6 +92,22 @@ def test_partial_toml_preserves_path_default() -> None:
 
     assert settings.model == "anthropic:test"
     assert settings.voices_root == default_voices_root()
+
+
+# ---------------------------------------------------------------------------
+# Deterministic serialization (Task 4)
+# ---------------------------------------------------------------------------
+
+
+def test_serialize_config_is_deterministic(tmp_path: Path) -> None:
+    voices = tmp_path / "voices"
+    # On Linux str(path) and as_posix() agree; on Windows str(path) preserves
+    # native backslashes which json.dumps escapes safely. We assert against
+    # the JSON-escaped form so the test reads the same way on every platform.
+    voices_literal = json.dumps(str(voices))
+    assert serialize_config("anthropic:test", voices) == (
+        f'model = "anthropic:test"\n\n[paths]\nvoices_root = {voices_literal}\n'
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +244,99 @@ def test_explicit_root_does_not_mask_environment_model(
 
     assert settings.model == "anthropic:environment"
     assert settings.voices_root == tmp_path / "explicit"
+
+
+# ---------------------------------------------------------------------------
+# Atomic initialization (Task 4)
+# ---------------------------------------------------------------------------
+
+
+def test_initialize_writes_built_in_and_xdg_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("PROSE_CRAFT_MODEL", "anthropic:environment")
+    monkeypatch.setenv(
+        "PROSE_CRAFT_VOICES_ROOT",
+        str(tmp_path / "environment-voices"),
+    )
+
+    created = initialize_config()
+    text = created.read_text(encoding="utf-8")
+
+    assert f'model = "{DEFAULT_MODEL}"' in text
+    assert "anthropic:environment" not in text
+    assert "environment-voices" not in text
+    # env overrides toml, so unset before parsing the generated file to prove
+    # round-trip validity of the defaults we just wrote.
+    monkeypatch.delenv("PROSE_CRAFT_VOICES_ROOT", raising=False)
+    monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
+    assert load_settings().voices_root == default_voices_root()
+
+
+def test_initialize_refuses_existing_file_without_parsing() -> None:
+    path = config_file()
+    path.parent.mkdir(parents=True)
+    original = b"\xffnot valid toml"
+    path.write_bytes(original)
+
+    with pytest.raises(ConfigAlreadyExists):
+        initialize_config()
+
+    assert path.read_bytes() == original
+
+
+def test_initialize_cleans_temporary_file_after_collision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = config_file()
+
+    def collide(source: PathLike[str], destination: PathLike[str]) -> None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("winner = true\n", encoding="utf-8")
+        raise FileExistsError(destination)
+
+    monkeypatch.setattr(os, "link", collide)
+
+    with pytest.raises(ConfigAlreadyExists):
+        initialize_config()
+
+    assert target.read_text(encoding="utf-8") == "winner = true\n"
+    assert list(target.parent.glob(f".{target.name}.*.tmp")) == []
+
+
+def test_initialize_cleans_temporary_file_after_link_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = config_file()
+
+    def fail_link(source: PathLike[str], destination: PathLike[str]) -> None:
+        raise OSError("link failed")
+
+    monkeypatch.setattr(os, "link", fail_link)
+
+    with pytest.raises(ConfigurationError, match="link failed"):
+        initialize_config()
+
+    assert not target.exists()
+    assert list(target.parent.glob(f".{target.name}.*.tmp")) == []
+
+
+def test_initialize_cleans_temporary_file_after_fsync_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = config_file()
+
+    def fail_fsync(descriptor: int) -> None:
+        raise OSError("sync failed")
+
+    monkeypatch.setattr(os, "fsync", fail_fsync)
+
+    with pytest.raises(ConfigurationError, match="sync failed"):
+        initialize_config()
+
+    assert not target.exists()
+    assert list(target.parent.glob(f".{target.name}.*.tmp")) == []
 
 
 # ---------------------------------------------------------------------------

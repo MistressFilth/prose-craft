@@ -18,12 +18,19 @@ The schema is strict: unknown keys, wrong-typed values, empty or
 relative paths, and malformed TOML all surface as
 :class:`ConfigurationError` carrying the offending file path so the
 user can fix it.
+
+The first-time configuration file is created by :func:`initialize_config`,
+which writes the deterministic defaults via :func:`serialize_config` and
+publishes them atomically with ``os.link`` so a half-written file can
+never appear at :func:`config_file`.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -51,9 +58,12 @@ __all__ = [
     "PathsSettings",
     "ProseCraftSettings",
     "ConfigurationError",
+    "ConfigAlreadyExists",
     "config_file",
     "get_model",
+    "initialize_config",
     "load_settings",
+    "serialize_config",
 ]
 
 DEFAULT_MODEL = "anthropic:claude-opus-4-5"
@@ -180,6 +190,19 @@ class ConfigurationError(RuntimeError):
         super().__init__(f"invalid configuration at {path}: {detail}")
 
 
+class ConfigAlreadyExists(ConfigurationError):
+    """The configuration file already exists; initialization was refused.
+
+    The pre-existing file is left exactly as it was — :func:`initialize_config`
+    does not parse it. The user can move it aside, or call
+    :func:`load_settings` to inspect it.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        ConfigurationError.__init__(self, path, "configuration already exists")
+
+
 def config_file() -> Path:
     """``<XDG_CONFIG_HOME>/prose-craft/config.toml``."""
     return xdg.config_home() / APP / "config.toml"
@@ -216,3 +239,61 @@ def _cast_settings_kwargs(values: dict[str, object]) -> Any:
     shaped mapping, which the real ``__init__`` accepts.
     """
     return values
+
+
+# ---------------------------------------------------------------------------
+# First-time initialization
+# ---------------------------------------------------------------------------
+
+
+def serialize_config(model: str, voices_root: Path) -> str:
+    """Render the configuration file body for ``(model, voices_root)``.
+
+    ``json.dumps`` produces a TOML basic string literal that is also a
+    valid JSON string literal — escapes for backslashes, control
+    characters, and the delimiter double-quote, with no surface area
+    for ``\\b`` to read as a TOML escape sequence. This keeps Windows
+    backslashes safe while staying readable on POSIX.
+    """
+    return f"model = {json.dumps(model)}\n\n[paths]\nvoices_root = {json.dumps(str(voices_root))}\n"
+
+
+def initialize_config() -> Path:
+    """Create the XDG config file with built-in defaults.
+
+    Refuses to overwrite an existing file: raises :class:`ConfigAlreadyExists`
+    and leaves the file untouched (it is not parsed). Publication is atomic
+    via ``os.link`` so a reader either sees no file or the fully-written
+    file — never a half-written one.
+    """
+    target = config_file()
+    if target.exists():
+        raise ConfigAlreadyExists(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f".{target.name}.",
+        suffix=".tmp",
+        dir=target.parent,
+    )
+    temporary = Path(temporary_name)
+    descriptor_open = True
+    try:
+        payload = serialize_config(DEFAULT_MODEL, default_voices_root())
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
+            descriptor_open = False
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, target)
+        except FileExistsError as exc:
+            raise ConfigAlreadyExists(target) from exc
+        return target
+    except ConfigAlreadyExists:
+        raise
+    except OSError as exc:
+        raise ConfigurationError(target, str(exc)) from exc
+    finally:
+        if descriptor_open:
+            os.close(fd)
+        temporary.unlink(missing_ok=True)
