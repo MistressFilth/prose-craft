@@ -262,6 +262,7 @@ def voice_show(
 ) -> None:
     """Print a voice profile as markdown or raw file."""
     from prose_craft.voices.index import VoiceIndex
+    from prose_craft.voices.location import voice_path
 
     if voices_root is not None:
         # Explicit --voices-root → single-root semantics (matches v0.4.0).
@@ -282,15 +283,20 @@ def voice_show(
         # Multi-root lookup via VoiceIndex. The annotation line surfaces
         # where the voice actually came from so an operator running the
         # command does not have to cross-reference `voice list`.
+        #
+        # Validate the name format FIRST via ``voice_path`` (cheap
+        # explicit-root variant — regex check + path join, no scan).
+        # ``VoiceIndex.build()`` does not enforce ``_NAME_RE``; it just
+        # enumerates whatever directories exist. Without this guard an
+        # invalidly named directory like ``123bad/voice.md`` could be
+        # picked up by the index and then read directly via
+        # ``entry.path.read_text()`` under ``--raw``, never raising the
+        # documented ``VoiceNameError``.
+        voice_path(name, root=load_settings().voices_root)
         entry = VoiceIndex.build().get(name)
         if entry is not None:
             typer.echo(f"[{entry.origin.value}] {entry.path}")
         else:
-            # VoiceIndex did not match. Validate the name format so an
-            # invalid name still surfaces as ``VoiceNameError`` (handled
-            # by ``_handle_errors`` to exit 2 with the documented wording
-            # — the test for path-traversal relies on this).
-            voice_path(name, root=load_settings().voices_root)
             # Name is valid but the voice does not exist anywhere.
             typer.echo(
                 f"[user] {load_settings().voices_root / name / 'voice.md'}"

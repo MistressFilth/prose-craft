@@ -103,6 +103,53 @@ def test_show_annotates_shared_origin(monkeypatch, tmp_path):
     assert "shipped" in result.stdout
 
 
+def test_show_rejects_invalid_name_in_shared_root_raw(monkeypatch, tmp_path):
+    """`voice show <invalid> --raw` must still raise ``VoiceNameError``.
+
+    Regression: ``VoiceIndex.build()`` enumerates directory names
+    without checking ``_NAME_RE``, so an invalidly named shared
+    directory like ``123bad/voice.md`` is picked up by the index even
+    though it would be rejected by ``voice_path()``. The previous
+    default-branch implementation validated the name only when the
+    index returned ``None`` — when the index DID match, ``--raw`` read
+    ``entry.path`` directly and bypassed the regex check entirely. The
+    fix validates the name BEFORE the index lookup so the documented
+    ``VoiceNameError`` → exit-2 wording is preserved across both
+    branches.
+    """
+    from typer.testing import CliRunner
+
+    from prose_craft.cli import app
+
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    # ``123bad`` fails ``_NAME_RE`` (must start with a letter) but
+    # VoiceIndex.build() will happily pick up the directory.
+    (shared / "prose-craft" / "voices" / "123bad").mkdir(parents=True)
+    (shared / "prose-craft" / "voices" / "123bad" / "voice.md").write_text(
+        "---\n"
+        "voice: 123bad\n"
+        "created: 2026-01-01\n"
+        "updated: 2026-01-01\n"
+        "register: {}\n"
+        "diction: {}\n"
+        "rhythm: {}\n"
+        "syntax: {}\n"
+        "lexicon: {}\n"
+        "structure: {}\n"
+        "---\n"
+        "body\n"
+    )
+
+    result = CliRunner().invoke(app, ["voice", "show", "123bad", "--raw"])
+
+    assert result.exit_code == 2, result.output
+    assert "invalid voice name" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_list_voices_root_override_single_root_only(monkeypatch, tmp_path):
     """Explicit --voices-root preserves v0.4.0 single-root semantics.
 
