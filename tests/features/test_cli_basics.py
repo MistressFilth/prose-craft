@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -253,25 +254,38 @@ def test_voice_init_uses_toml_voices_root(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _prec_toml() -> str:
-    """The TOML the precedence tests start from."""
-    return 'model = "anthropic:toml-4-5"\n\n[paths]\nvoices_root = "/tmp/toml-voices"\n'
+def _prec_toml(toml_root: Path) -> str:
+    """The TOML the precedence tests start from.
+
+    ``toml_root`` must be an absolute path under ``tmp_path`` so the
+    strict ``PathsSettings.validate_voices_root`` check accepts it on
+    every platform. Hard-coding POSIX ``/tmp/...`` would reject the
+    value on Windows (``Path.is_absolute()`` returns ``False``), which
+    surfaces as ``configuration error`` and breaks the precedence
+    ordering before any of the layers can be exercised.
+    """
+    return f'model = "anthropic:toml-4-5"\n\n[paths]\nvoices_root = {json.dumps(str(toml_root))}\n'
 
 
-def test_cli_overrides_environment_over_toml(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_overrides_environment_over_toml(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Explicit flags beat the environment, which beats TOML."""
-    _write_config(_prec_toml())
-    explicit_root = "/tmp/explicit-voices"
+    toml_root = tmp_path / "toml-voices"
+    explicit_root = tmp_path / "explicit-voices"
     explicit_model = "anthropic:explicit-4-5"
-    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", "/tmp/env-voices")
-    monkeypatch.setenv("PROSE_CRAFT_MODEL", "anthropic:env-4-5")
+    environment_root = tmp_path / "env-voices"
+    environment_model = "anthropic:env-4-5"
+    _write_config(_prec_toml(toml_root))
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(environment_root))
+    monkeypatch.setenv("PROSE_CRAFT_MODEL", environment_model)
 
     result = runner.invoke(
         app,
         [
             "config",
             "--voices-root",
-            explicit_root,
+            str(explicit_root),
             "--model",
             explicit_model,
         ],
@@ -279,37 +293,40 @@ def test_cli_overrides_environment_over_toml(monkeypatch: pytest.MonkeyPatch) ->
 
     assert result.exit_code == 0, result.output
     assert f"model: {explicit_model}" in result.output
-    assert f"voices_root: {Path(explicit_root).resolve()}" in result.output
+    assert f"voices_root: {explicit_root.resolve()}" in result.output
 
 
-def test_environment_overrides_toml(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_environment_overrides_toml(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Env vars beat TOML when no CLI override is given."""
-    _write_config(_prec_toml())
-    environment_root = "/tmp/env-voices"
+    toml_root = tmp_path / "toml-voices"
+    environment_root = tmp_path / "env-voices"
     environment_model = "anthropic:env-4-5"
-    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", environment_root)
+    _write_config(_prec_toml(toml_root))
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(environment_root))
     monkeypatch.setenv("PROSE_CRAFT_MODEL", environment_model)
 
     result = runner.invoke(app, ["config"])
 
     assert result.exit_code == 0, result.output
     assert f"model: {environment_model}" in result.output
-    assert f"voices_root: {Path(environment_root)}" in result.output
+    assert f"voices_root: {environment_root}" in result.output
 
 
-def test_toml_overrides_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_toml_overrides_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """When TOML is set and env is clear, TOML wins over defaults."""
-    toml_root = "/tmp/toml-voices"
+    toml_root = tmp_path / "toml-voices"
     toml_model = "anthropic:toml-4-5"
     monkeypatch.delenv("PROSE_CRAFT_VOICES_ROOT", raising=False)
     monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
-    _write_config(f'model = "{toml_model}"\n\n[paths]\nvoices_root = "{toml_root}"\n')
+    _write_config(
+        f'model = "{toml_model}"\n\n[paths]\nvoices_root = {json.dumps(str(toml_root))}\n'
+    )
 
     result = runner.invoke(app, ["config"])
 
     assert result.exit_code == 0, result.output
     assert f"model: {toml_model}" in result.output
-    assert f"voices_root: {Path(toml_root)}" in result.output
+    assert f"voices_root: {toml_root}" in result.output
 
 
 def test_config_init_dirties_no_env_after_load(monkeypatch: pytest.MonkeyPatch) -> None:
