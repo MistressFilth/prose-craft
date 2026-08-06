@@ -111,3 +111,84 @@ def test_import_voice_missing_errors(monkeypatch, tmp_path):
     monkeypatch.delenv("XDG_DATA_DIRS", raising=False)
     with pytest.raises(VoiceImportError, match="not found"):
         import_voice("ghost")
+
+
+def test_list_voices_user_broken_blocks_shadow_shared(monkeypatch, tmp_path):
+    """A malformed user voice must shadow a valid shared voice of the
+    same name.
+
+    Regression: ``list_voices`` previously only added a directory
+    name to its dedupe set after a successful parse. A broken user
+    ``voice.md`` therefore failed to block the shared fallback, and
+    the user saw the shared voice instead of being told their local
+    copy is broken. The fix marks the directory as seen the moment
+    ``voice.md`` is on disk, regardless of parse outcome.
+    """
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    # User directory: malformed front-matter.
+    (user / "alpha").mkdir(parents=True)
+    (user / "alpha" / "voice.md").write_text("not yaml")
+    # Shared directory: valid front-matter under the same name.
+    (shared / "prose-craft" / "voices" / "alpha").mkdir(parents=True)
+    (shared / "prose-craft" / "voices" / "alpha" / "voice.md").write_text(
+        _VALID_FRONTMATTER.format(name="alpha")
+    )
+    summaries = list_voices()
+    names = {v.name for v in summaries}
+    # Broken user voice blocks the shared fallback — neither appears
+    # in the list. The breakage is surfaced through list_voice_errors.
+    assert "alpha" not in names
+
+
+def test_list_voice_errors_user_broken_blocks_shadow_shared(monkeypatch, tmp_path):
+    """The malformed user voice above must be reported, not silently
+    dropped, so the user knows their local ``voice.md`` is broken.
+
+    Pairs with :func:`test_list_voices_user_broken_blocks_shadow_shared`:
+    the user's broken ``voice.md`` is the one we want them to see in
+    the error list, not the shared one (which is valid).
+    """
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    (user / "alpha").mkdir(parents=True)
+    (user / "alpha" / "voice.md").write_text("not yaml")
+    (shared / "prose-craft" / "voices" / "alpha").mkdir(parents=True)
+    (shared / "prose-craft" / "voices" / "alpha" / "voice.md").write_text(
+        _VALID_FRONTMATTER.format(name="alpha")
+    )
+    errs = list_voice_errors()
+    assert len(errs) == 1
+    assert errs[0].name == "alpha"
+    # The error path is the user-side file, not the shared one.
+    assert str(user) in errs[0].error
+
+
+def test_list_voice_errors_empty_user_dir_does_not_block_shared(monkeypatch, tmp_path):
+    """An empty user directory must not suppress a shared voice error
+    of the same name.
+
+    Regression: ``list_voice_errors`` previously marked every
+    directory as seen regardless of whether ``voice.md`` existed.
+    An empty user directory then suppressed a shared voice
+    directory of the same name even when the shared ``voice.md``
+    failed to parse, hiding breakage from the user. The fix only
+    marks the name seen after ``voice.md`` is confirmed present.
+    """
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    # User directory: exists, empty (no voice.md).
+    (user / "alpha").mkdir(parents=True)
+    # Shared directory: malformed voice.md under the same name.
+    (shared / "prose-craft" / "voices" / "alpha").mkdir(parents=True)
+    (shared / "prose-craft" / "voices" / "alpha" / "voice.md").write_text("not yaml")
+    errs = list_voice_errors()
+    assert len(errs) == 1
+    assert errs[0].name == "alpha"
+    assert str(shared) in errs[0].error

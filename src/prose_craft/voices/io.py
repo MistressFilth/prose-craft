@@ -23,17 +23,6 @@ if TYPE_CHECKING:
     from prose_craft.voices.model import VoiceProfile
 
 
-def _default_root() -> Path:
-    """The active voices root.
-
-    Deferred import: ``prose_craft.config`` reaches back into this
-    package, so a module-level import would cycle.
-    """
-    from prose_craft.config import load_settings
-
-    return load_settings().voices_root
-
-
 class VoiceProfileNotFound(FileNotFoundError):
     """Raised when a voice profile does not exist on disk."""
 
@@ -206,11 +195,17 @@ def list_voices(*, root: Path | None = None) -> list[VoiceSummary]:
             candidate = child / "voice.md"
             if not candidate.is_file():
                 continue
+            # Mark the directory name as seen the moment ``voice.md``
+            # exists, *before* parsing. A malformed user voice then
+            # blocks the shared fallback of the same name — the user
+            # directory is authoritative for its name even when its
+            # contents are broken. Parse failures surface through
+            # :func:`list_voice_errors`, not here.
+            seen.add(child.name)
             try:
                 profile = _parse_voice_file(candidate)
             except Exception:
                 continue
-            seen.add(profile.voice)
             out.append(VoiceSummary(name=profile.voice, updated=profile.updated))
 
     for r in roots:
@@ -239,10 +234,14 @@ def list_voice_errors(*, root: Path | None = None) -> list[VoiceError]:
         for child in sorted(base.iterdir()):
             if not child.is_dir() or child.name in seen:
                 continue
-            seen.add(child.name)
             candidate = child / "voice.md"
             if not candidate.is_file():
                 continue
+            # Mark the name seen *after* ``voice.md`` is confirmed
+            # present, so an empty user directory does not block a
+            # shared voice directory with the same name from being
+            # reported when it has a malformed ``voice.md``.
+            seen.add(child.name)
             try:
                 _parse_voice_file(candidate)
             except Exception as exc:
