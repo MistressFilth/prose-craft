@@ -60,6 +60,49 @@ def test_list_origin_filter_shared(voices_tree):
     assert "extra" in result.stdout
 
 
+def test_show_annotates_shared_origin(monkeypatch, tmp_path):
+    """`voice show <name>` prepends `[shared]` for a voice from $XDG_DATA_DIRS.
+
+    The annotation gives operators a one-line signal of where a voice
+    came from without having to cross-reference `voice list`. Pairs
+    with the per-origin list filter above so the same vocabulary
+    appears across both commands.
+
+    The fixture profile is parseable end-to-end (VoiceProfile rejects
+    extras and requires every D-block) so ``voice show`` can complete
+    the full render; the assertion is on the annotation, not the body.
+    """
+    from typer.testing import CliRunner
+
+    from prose_craft.cli import app
+
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    (shared / "prose-craft" / "voices" / "shipped").mkdir(parents=True)
+    (shared / "prose-craft" / "voices" / "shipped" / "voice.md").write_text(
+        "---\n"
+        "voice: shipped\n"
+        "created: 2026-01-01\n"
+        "updated: 2026-01-01\n"
+        "register: {}\n"
+        "diction: {}\n"
+        "rhythm: {}\n"
+        "syntax: {}\n"
+        "lexicon: {}\n"
+        "structure: {}\n"
+        "---\n"
+        "body\n"
+    )
+
+    result = CliRunner().invoke(app, ["voice", "show", "shipped"])
+
+    assert result.exit_code == 0, result.output
+    assert "[shared]" in result.stdout
+    assert "shipped" in result.stdout
+
+
 def test_list_voices_root_override_single_root_only(monkeypatch, tmp_path):
     """Explicit --voices-root preserves v0.4.0 single-root semantics.
 

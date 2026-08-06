@@ -261,16 +261,48 @@ def voice_show(
     voices_root: Path | None = typer.Option(None, "--voices-root"),
 ) -> None:
     """Print a voice profile as markdown or raw file."""
-    root = _voices_root_opt(voices_root)
-    if raw:
-        from prose_craft.voices.io import _resolve_voice_path
+    from prose_craft.voices.index import VoiceIndex
 
-        path = _resolve_voice_path(name, root)
-        if path is None:
-            raise typer.BadParameter(f"voice {name!r} not found at {voice_path(name, root=root)}")
-        typer.echo(path.read_text(encoding="utf-8"))
-        return
-    profile, body = read_voice_raw(name, root=root)
+    if voices_root is not None:
+        # Explicit --voices-root → single-root semantics (matches v0.4.0).
+        root = _voices_root_opt(voices_root)
+        typer.echo(f"[user] {root / name / 'voice.md'}")
+        if raw:
+            from prose_craft.voices.io import _resolve_voice_path
+
+            path = _resolve_voice_path(name, root)
+            if path is None:
+                raise typer.BadParameter(
+                    f"voice {name!r} not found at {voice_path(name, root=root)}"
+                )
+            typer.echo(path.read_text(encoding="utf-8"))
+            return
+        profile, body = read_voice_raw(name, root=root)
+    else:
+        # Multi-root lookup via VoiceIndex. The annotation line surfaces
+        # where the voice actually came from so an operator running the
+        # command does not have to cross-reference `voice list`.
+        entry = VoiceIndex.build().get(name)
+        if entry is not None:
+            typer.echo(f"[{entry.origin.value}] {entry.path}")
+        else:
+            # VoiceIndex did not match. Validate the name format so an
+            # invalid name still surfaces as ``VoiceNameError`` (handled
+            # by ``_handle_errors`` to exit 2 with the documented wording
+            # — the test for path-traversal relies on this).
+            voice_path(name, root=load_settings().voices_root)
+            # Name is valid but the voice does not exist anywhere.
+            typer.echo(
+                f"[user] {load_settings().voices_root / name / 'voice.md'}"
+            )
+        if raw:
+            if entry is None:
+                raise typer.BadParameter(f"voice {name!r} not found")
+            typer.echo(entry.path.read_text(encoding="utf-8"))
+            return
+        # ``root=None`` lets ``voice_path`` walk every root in
+        # precedence order so a shared voice resolves correctly.
+        profile, body = read_voice_raw(name, root=None)
     typer.echo(f"# {profile.voice}\n")
     typer.echo(f"purpose: {profile.purpose or '(unset)'}")
     typer.echo(f"audience: {profile.audience or '(unset)'}\n")
