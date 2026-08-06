@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 from prose_craft.voices.location import voice_roots
 
@@ -16,7 +17,7 @@ class Origin(Enum):
 @dataclass(frozen=True)
 class VoiceEntry:
     origin: Origin
-    path: "Path"  # noqa: F821
+    path: Path
     mtime_ns: int
 
 
