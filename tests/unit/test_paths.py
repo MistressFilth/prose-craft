@@ -58,39 +58,11 @@ def test_app_data_dir_is_not_created(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 # ---------------------------------------------------------------------------
 # Voices root
 # ---------------------------------------------------------------------------
-
-
-def test_voices_root_composes_from_data_home(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
-    assert paths.voices_root() == tmp_path / "data" / "prose-craft" / "voices"
-
-
-def test_voices_root_honors_direct_override(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """The direct override names a directory outright, suffix and all."""
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
-    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path / "elsewhere"))
-    assert paths.voices_root() == tmp_path / "elsewhere"
-
-
-def test_voices_root_override_beats_prose_craft_xdg_override(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setenv("PROSE_CRAFT_XDG_DATA_HOME", str(tmp_path / "xdg"))
-    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path / "elsewhere"))
-    assert paths.voices_root() == tmp_path / "elsewhere"
-
-
-@pytest.mark.parametrize("value", ["relative/voices", "../up", ""])
-def test_voices_root_ignores_invalid_override(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, value: str
-) -> None:
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
-    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", value)
-    assert paths.voices_root() == tmp_path / "data" / "prose-craft" / "voices"
+#
+# The environment-aware ``voices_root()`` resolver was retired in
+# Task 5; the configured voices root now lives in
+# :mod:`prose_craft.config` and is tested there. This module owns only
+# the XDG-derived default.
 
 
 def test_default_voices_root_composes_from_data_home(
@@ -99,9 +71,7 @@ def test_default_voices_root_composes_from_data_home(
 ) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
 
-    assert paths.default_voices_root() == (
-        tmp_path / "data" / "prose-craft" / "voices"
-    )
+    assert paths.default_voices_root() == (tmp_path / "data" / "prose-craft" / "voices")
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +101,7 @@ def test_composer_state_dir_is_outside_the_voices_root(
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     composer = paths.composer_state_dir()
-    voices = paths.voices_root()
+    voices = paths.default_voices_root()
     assert voices not in composer.parents
     assert composer != voices
 
@@ -144,7 +114,7 @@ def test_composer_state_dir_outside_voices_when_roots_coincide(
     monkeypatch.setenv("XDG_DATA_HOME", shared)
     monkeypatch.setenv("XDG_STATE_HOME", shared)
     composer = paths.composer_state_dir()
-    voices = paths.voices_root()
+    voices = paths.default_voices_root()
     assert voices not in composer.parents
     assert composer.parent == voices.parent
 

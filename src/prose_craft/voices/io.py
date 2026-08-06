@@ -26,12 +26,12 @@ if TYPE_CHECKING:
 def _default_root() -> Path:
     """The active voices root.
 
-    Deferred import: ``prose_craft.paths`` reaches back into this
+    Deferred import: ``prose_craft.config`` reaches back into this
     package, so a module-level import would cycle.
     """
-    from prose_craft.paths import voices_root
+    from prose_craft.config import load_settings
 
-    return voices_root()
+    return load_settings().voices_root
 
 
 class VoiceProfileNotFound(FileNotFoundError):

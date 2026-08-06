@@ -20,10 +20,10 @@ def test_voice_path_allows_hyphens(tmp_voices_root: Path) -> None:
     assert voice_path("d-nova", root=tmp_voices_root) == tmp_voices_root / "d-nova" / "voice.md"
 
 
-def test_voice_path_defaults_to_paths_voices_root(
+def test_voice_path_defaults_to_load_settings(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """A None root delegates to paths.voices_root()."""
+    """A None root delegates to load_settings().voices_root."""
     monkeypatch.delenv("PROSE_CRAFT_VOICES_ROOT", raising=False)
     monkeypatch.delenv("PROSE_CRAFT_XDG_DATA_HOME", raising=False)
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
@@ -39,7 +39,7 @@ def test_voice_path_default_honors_direct_override(
 
 
 def test_get_voices_root_is_gone() -> None:
-    """The resolver moved to paths.voices_root()."""
+    """The earlier ``get_voices_root`` resolver moved to ``paths``."""
     from prose_craft.voices import location
 
     assert not hasattr(location, "get_voices_root")
