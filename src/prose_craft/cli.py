@@ -207,20 +207,50 @@ def config(
 @_handle_errors
 def voice_list(
     voices_root: Path | None = typer.Option(None, "--voices-root"),
+    origin: str = typer.Option(
+        "all",
+        "--origin",
+        help="Filter by voice origin.",
+        case_sensitive=False,
+    ),
 ) -> None:
-    """List every voice under the active root."""
+    """List voices under the active root (user + shared by default)."""
+    from prose_craft.voices.index import Origin, VoiceIndex
     from prose_craft.voices.io import list_voice_errors
 
-    root = _voices_root_opt(voices_root)
-    summaries = list_voices(root=root)
-    if not summaries:
+    if origin not in ("user", "shared", "all"):
+        raise typer.BadParameter("--origin must be one of: user, shared, all")
+
+    if voices_root is not None:
+        # Explicit override → single-root semantics, same as v0.4.0.
+        root = _voices_root_opt(voices_root)
+        summaries = list_voices(root=root)
+        if not summaries:
+            typer.echo("(no voices found)")
+        else:
+            for s in summaries:
+                typer.echo(f"{s.name}  ({s.updated.isoformat()})")
+        errors = list_voice_errors(root=root)
+        for e in errors:
+            typer.echo(f"error: {e.name}: {e.error}", err=True)
+        return
+
+    # Default → multi-root scan via VoiceIndex.
+    idx = VoiceIndex.build()
+    rows: list[tuple[str, Origin]] = []
+    for name, entry in idx:
+        if origin != "all" and (
+            (origin == "user" and entry.origin is not Origin.USER)
+            or (origin == "shared" and entry.origin is not Origin.SHARED)
+        ):
+            continue
+        rows.append((name, entry.origin))
+    rows.sort(key=lambda r: r[0])
+    if not rows:
         typer.echo("(no voices found)")
-    else:
-        for s in summaries:
-            typer.echo(f"{s.name}  ({s.updated.isoformat()})")
-    errors = list_voice_errors(root=root)
-    for e in errors:
-        typer.echo(f"error: {e.name}: {e.error}", err=True)
+        return
+    for name, o in rows:
+        typer.echo(f"{name} [{o.value}]")
 
 
 @voice_app.command("show")
