@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -295,19 +296,31 @@ async def voice_compose_step(
 
 @mcp.resource("prose://voices")
 async def list_voices_resource() -> str:
-    """Markdown list of every voice under the active root."""
-    settings = load_settings()
-    summaries = list_voices(root=settings.voices_root)
-    if not summaries:
+    """Markdown list of every visible voice (user + shared)."""
+    idx = _get_index()
+    rows = []
+    for name, entry in idx:
+        updated = entry.path.stat().st_mtime
+        rows.append((name, entry.origin, updated))
+    if not rows:
         return "(no voices)"
-    return "\n".join(f"- {s.name}  ({s.updated.isoformat()})" for s in summaries)
+    rows.sort(key=lambda row: row[0])
+    lines = []
+    for name, origin, mtime in rows:
+        # Best-effort ISO date from mtime; voice files don't carry a stable
+        # `updated` field across roots so we use file mtime as a proxy.
+        iso = datetime.fromtimestamp(mtime, tz=timezone.utc).date().isoformat()
+        lines.append(f"- {name} [{origin.value}]  ({iso})")
+    return "\n".join(lines)
 
 
 @mcp.resource("prose://voices/{name}")
 async def read_voice_resource(name: str) -> str:
-    """Raw voice.md for the named voice, including front-matter + prose body."""
-    settings = load_settings()
-    return read_voice_file(name, root=settings.voices_root)
+    """Raw voice.md for the named voice (user or shared)."""
+    from prose_craft.voices.location import voice_path
+
+    path = voice_path(name)
+    return path.read_text(encoding="utf-8")
 
 
 def run_stdio() -> None:
