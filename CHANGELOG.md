@@ -4,6 +4,9 @@
 
 ## [0.6.0] - 2026-08-07
 
+### Fixed
+- `TestDataDirs` in `tests/unit/test_xdg.py` used hardcoded colons in `$XDG_DATA_DIRS` fixtures, which on Windows (where `os.pathsep` is `;`) made the entire string one entry and tripped the `is_absolute()` validation. The fixtures now use `os.pathsep.join(...)` so the round-trip matches the platform separator. The class is also skipped on Windows because the POSIX-style `/a`, `/b`, `/c` paths used in the assertions are not absolute there.
+
 ### Added
 - `$XDG_DATA_DIRS` lookup for shared voice packs. System-installed voices are visible alongside user voices; user voices shadow shared by name; first invocation of `voice edit --voice <name>` against a shared-only voice copies it to the user root.
 - `voice import <name>` to explicitly copy a shared voice into the user root without invoking the agent.

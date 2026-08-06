@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -181,21 +182,25 @@ def test_module_knows_no_application_name() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX-style /a, /b, /c paths are not absolute on Windows",
+)
 class TestDataDirs:
     def test_returns_empty_when_unset(self, monkeypatch):
         monkeypatch.delenv("XDG_DATA_DIRS", raising=False)
         assert xdg.data_dirs() == [Path("/usr/local/share"), Path("/usr/share")]
 
     def test_splits_on_pathsep(self, monkeypatch):
-        monkeypatch.setenv("XDG_DATA_DIRS", "/a:/b:/c")
+        monkeypatch.setenv("XDG_DATA_DIRS", os.pathsep.join(["/a", "/b", "/c"]))
         assert xdg.data_dirs() == [Path("/a"), Path("/b"), Path("/c")]
 
     def test_skips_empty_entries(self, monkeypatch):
-        monkeypatch.setenv("XDG_DATA_DIRS", "/a::/b:")
+        monkeypatch.setenv("XDG_DATA_DIRS", os.pathsep.join(["/a", "", "/b", ""]))
         assert xdg.data_dirs() == [Path("/a"), Path("/b")]
 
     def test_skips_relative_entries(self, monkeypatch):
-        monkeypatch.setenv("XDG_DATA_DIRS", "/a:relative:../up")
+        monkeypatch.setenv("XDG_DATA_DIRS", os.pathsep.join(["/a", "relative", "../up"]))
         assert xdg.data_dirs() == [Path("/a")]
 
     def test_returns_default_when_only_invalid(self, monkeypatch):
