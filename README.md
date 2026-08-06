@@ -25,8 +25,9 @@ plus its dev tools.
 ## Quickstart
 
 ```bash
-# List voices
+# List voices (each entry annotated [user] or [shared]; --origin filters by source)
 prose voice list
+prose voice list --origin shared
 
 # Analyze a draft (no LLM round-trip when --metrics-only)
 prose analyze chapter.md --voice MistressFilth --metrics-only
@@ -83,6 +84,7 @@ Prose-craft honors the [XDG Base Directory Specification](https://specifications
 | | Linux | macOS | Windows |
 |---|---|---|---|
 | Voices | `~/.local/share/prose-craft/voices/` | `~/Library/Application Support/prose-craft/voices/` | `%LOCALAPPDATA%\prose-craft\voices\` |
+| Shared voices | `$XDG_DATA_DIRS[i]/prose-craft/voices/` (in spec order) | `$XDG_DATA_DIRS[i]/prose-craft/voices/` (in spec order) | `$XDG_DATA_DIRS[i]/prose-craft/voices/` (in spec order) |
 | Composer state | `~/.local/state/prose-craft/composer-state/` | `~/Library/Application Support/prose-craft/composer-state/` | `%LOCALAPPDATA%\prose-craft\composer-state\` |
 | Draft scratch | `$XDG_RUNTIME_DIR/prose-craft/scratch/` | `~/Library/Caches/TemporaryItems/prose-craft/scratch/` | `%LOCALAPPDATA%\Temp\prose-craft\scratch\` |
 
@@ -144,6 +146,30 @@ of the above; `--voices-root` is its per-invocation equivalent.
 If `XDG_RUNTIME_DIR` is exported but unusable — common under WSL, in containers,
 and in ssh sessions without a login session — scratch files fall back to
 `<state-root>/prose-craft/run/`.
+
+## Shared voice packs
+
+`$XDG_DATA_DIRS` lists system-wide data directories. Each entry may host a
+voice pack at `<dir>/prose-craft/voices/<name>/voice.md`. Packages ship
+voices by dropping a `voice.md` there; every user on the host sees them via
+`voice list` without copying anything.
+
+Resolution precedence:
+
+1. User root (`$XDG_DATA_HOME/prose-craft/voices`).
+2. Each `$XDG_DATA_DIRS[i]/prose-craft/voices` in spec order.
+
+A user voice of the same name shadows a shared one. The first invocation of
+`voice edit --voice X` against a shared-only voice copies it to the user root
+before the agent runs. `voice import X` does the copy without invoking the
+agent.
+
+`voice list` shows the origin tag (`[user]` or `[shared]`) on each entry and
+accepts `--origin {user,shared,all}` to filter; `voice show X` prints the
+origin and resolved path alongside the profile.
+
+Distribution convention: package `<name>/voice.md` under
+`<system-data-dir>/prose-craft/voices/<name>/`.
 
 ## Migrating from the old plugin
 
