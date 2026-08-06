@@ -32,6 +32,7 @@ import platformdirs
 __all__ = [
     "cache_home",
     "config_home",
+    "data_dirs",
     "data_home",
     "env_path",
     "runtime_dir",
@@ -100,6 +101,40 @@ def _xdg_root(spec_var: str, native: Callable[[], str]) -> Path:
             return candidate
     with _sanitized_env():
         return Path(native())
+
+
+_DEFAULT_DATA_DIRS = (Path("/usr/local/share"), Path("/usr/share"))
+
+
+def data_dirs() -> list[Path]:
+    """System-wide data directories from ``$XDG_DATA_DIRS``.
+
+    Splits on :data:`os.pathsep`, drops entries that are unset, empty,
+    or relative (per :func:`env_path`'s validity rule), and falls back
+    to the freedesktop-spec default ``["/usr/local/share", "/usr/share"]``
+    when the environment yields no valid entries. Returns bare roots;
+    callers append the application suffix.
+    """
+    raw = os.environ.get("XDG_DATA_DIRS")
+    if raw:
+        out: list[Path] = []
+        for piece in raw.split(os.pathsep):
+            candidate = env_path_for_data_dirs(piece)
+            if candidate is not None:
+                out.append(candidate)
+        if out:
+            return out
+    return list(_DEFAULT_DATA_DIRS)
+
+
+def env_path_for_data_dirs(raw: str) -> Path | None:
+    """Validate one ``$XDG_DATA_DIRS`` entry. Mirrors :func:`env_path`."""
+    if not raw:
+        return None
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        return None
+    return path
 
 
 def data_home() -> Path:
