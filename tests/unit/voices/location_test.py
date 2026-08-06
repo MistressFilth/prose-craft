@@ -1,4 +1,5 @@
 """Tests for prose_craft.voices.location."""
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -54,4 +54,5 @@ def voice_path(name: str, *, root: Path | None = None) -> Path:
     # synthesize a path even for missing voices (write_voice) get the
     # expected target location.
     from prose_craft.config import load_settings
+
     return load_settings().voices_root / name / "voice.md"

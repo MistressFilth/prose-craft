@@ -1,4 +1,5 @@
 """In-memory voice index across user and shared roots."""
+
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping

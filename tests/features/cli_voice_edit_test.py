@@ -1,4 +1,5 @@
 """Feature tests for auto-shadow before voice edit."""
+
 from __future__ import annotations
 
 import pytest
@@ -66,9 +67,7 @@ def test_edit_user_voice_does_not_reshadow(monkeypatch, shipped_voice, tmp_path)
     assert "LOCAL" in text
 
 
-def test_edit_voices_root_override_shadows_to_override_root(
-    monkeypatch, shipped_voice, tmp_path
-):
+def test_edit_voices_root_override_shadows_to_override_root(monkeypatch, shipped_voice, tmp_path):
     user, _, target = shipped_voice
     override = tmp_path / "override"
     monkeypatch.setenv("PROSE_CRAFT_MODEL", "anthropic:claude-opus-4-5")

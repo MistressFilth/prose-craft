@@ -298,9 +298,7 @@ def voice_show(
             typer.echo(f"[{entry.origin.value}] {entry.path}")
         else:
             # Name is valid but the voice does not exist anywhere.
-            typer.echo(
-                f"[user] {load_settings().voices_root / name / 'voice.md'}"
-            )
+            typer.echo(f"[user] {load_settings().voices_root / name / 'voice.md'}")
         if raw:
             if entry is None:
                 raise typer.BadParameter(f"voice {name!r} not found")
@@ -843,9 +841,7 @@ def voice_edit(
     from prose_craft.voices.index import Origin, VoiceIndex
     from prose_craft.voices.io import VoiceImportError, import_voice
 
-    shadow_root = (
-        voices_root if voices_root is not None else load_settings().voices_root
-    )
+    shadow_root = voices_root if voices_root is not None else load_settings().voices_root
     entry = VoiceIndex.build().get(voice)
     if entry is not None and entry.origin is Origin.SHARED:
         try:

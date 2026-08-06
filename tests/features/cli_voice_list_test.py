@@ -1,4 +1,5 @@
 """Feature tests for the `voice list` command with shared roots."""
+
 from __future__ import annotations
 
 import pytest

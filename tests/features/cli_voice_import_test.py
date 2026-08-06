@@ -1,4 +1,5 @@
 """Feature tests for `voice import`."""
+
 from __future__ import annotations
 
 import pytest
