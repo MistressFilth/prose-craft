@@ -178,11 +178,41 @@ def test_config_init_refuses_existing_file() -> None:
 
 
 def test_config_init_rejects_combined_overrides() -> None:
-    """`--init` and the override flags are mutually exclusive."""
+    """`--init` combined with `--model` is a clean exit-2, no traceback.
+
+    Regression: an earlier revision raised ``typer.BadParameter`` inside
+    the command and let it fall through the generic ``Exception`` arm of
+    ``_handle_errors``, which prints a traceback and exits 1 — wrong for
+    a documented, user-facing parameter conflict.
+    """
     result = runner.invoke(app, ["config", "--init", "--model", "anthropic:test"])
 
-    assert result.exit_code != 0
+    assert result.exit_code == 2
     assert "--init" in result.output
+    assert "cannot be combined" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_analyze_metrics_only_survives_malformed_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`analyze --metrics-only` must not consult the config file.
+
+    The metrics-only path is a deterministic analyzer that reads only
+    the file argument; loading settings is wasted work and any error
+    there must not poison the command. A broken TOML config file
+    therefore must not affect this command's exit code or output.
+    """
+    draft = tmp_path / "draft.md"
+    draft.write_text("This is a short draft.", encoding="utf-8")
+    _write_config('model = "unterminated\n')
+
+    result = runner.invoke(app, ["analyze", "--metrics-only", str(draft)])
+
+    assert result.exit_code == 0, result.output
+    assert "Traceback" not in result.output
+    assert "configuration error" not in result.output
+    assert "Words" in result.output
 
 
 def test_version_ignores_malformed_config() -> None:

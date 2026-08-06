@@ -34,6 +34,7 @@ import sys
 import traceback
 from typing import Any, Literal
 
+import click
 import typer
 from pydantic_ai import ModelRetry, UsageLimitExceeded
 from rich.console import Console
@@ -116,6 +117,16 @@ def _handle_errors(func: Any) -> Any:
             raise typer.Exit(code=2) from exc
         except ConfigurationError as exc:
             typer.echo(f"configuration error: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+        except (typer.BadParameter, click.UsageError) as exc:
+            # Parameter conflicts (``--init`` + ``--model``, etc.) and
+            # any other user-facing argument validation errors must not
+            # print a traceback. ``typer.BadParameter`` and
+            # ``click.UsageError`` are sibling class hierarchies
+            # (typer's exceptions live in ``typer._click.exceptions``);
+            # catching both keeps the handler robust whichever one a
+            # given command raises.
+            typer.echo(str(exc), err=True)
             raise typer.Exit(code=2) from exc
         except Exception:
             traceback.print_exc(file=sys.stderr)
