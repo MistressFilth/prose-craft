@@ -183,7 +183,19 @@ def write_voice(
             # No prior voice.md; write an empty body.
             body = ""
 
-    path = _io_write_voice(profile, prose_body=body)
+    # Pin ``root=`` to the configured user voices root explicitly so the
+    # unbound tool never depends on the default behavior of
+    # ``_io_write_voice`` / ``voice_path``. If those primitives ever grow
+    # a shared-root walk (e.g. ``root=None`` resolves to the system
+    # voices directory when a same-named voice is installed there), the
+    # bind-composer path would still write to the configured user root
+    # because every wrapper closes over ``root``; but the unbound
+    # ``write_voice`` here is reachable from any agent that wires it up
+    # directly, so it must be safe-by-construction regardless of how the
+    # default root resolution evolves.
+    from prose_craft.config import load_settings
+
+    path = _io_write_voice(profile, prose_body=body, root=load_settings().voices_root)
     return f"wrote {path}"
 
 

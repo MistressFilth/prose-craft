@@ -1,13 +1,26 @@
 repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^((src/prose_craft|tests|scripts)/|pyproject\.toml$)
+      - id: ruff-format
+        files: ^((src/prose_craft|tests|scripts)/|pyproject\.toml$)
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    rev: v0.0.65
+    hooks:
+      - id: ty
+        # --frozen keeps uv from regenerating uv.lock during a commit
+        args: ["--frozen"]
   - repo: local
     hooks:
-      - id: make-check
-        name: make check
-        entry: make check
-        language: system
-        pass_filenames: false
-      - id: make-test
+      - id: test
         name: make test
-        entry: make test
+        # Strip pre-commit's GIT_* so test fixtures that init their own
+        # repos walk up to the real toplevel instead of pre-commit's
+        # GIT_DIR.
+        entry: env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_COMMON_DIR uv run make test
         language: system
         pass_filenames: false
+        stages: [pre-commit]

@@ -1,10 +1,10 @@
 .PHONY: init sync test unit-test features-test clean lint typecheck format format-check check release help
 
 init:
-	uv sync --all-extras
+	uv sync --all-extras && uv run pre-commit install
 
 sync:
-	uv sync --all-extras
+	uv sync --all-extras && uv run pre-commit install
 
 unit-test:
 	uv run pytest tests/unit -v

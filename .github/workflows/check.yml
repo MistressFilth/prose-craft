@@ -29,6 +29,12 @@ jobs:
       - run: make check
       - run: make test
 
+      # Catches commits that bypassed local hooks with `git commit --no-verify`.
+      # Runs the same hooks as the developer's pre-commit install would, against
+      # every file in the tree, on every OS in the matrix.
+      - name: Run pre-commit hooks
+        run: uv run pre-commit run --all-files
+
   # The aggregating gate. Branch protection requires a status context
   # named exactly "check"; a matrix job reports as "check (<os>)" and
   # would never satisfy it. Keeping the required context on a separate
