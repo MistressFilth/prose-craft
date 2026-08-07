@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-06
+
 ### Added
 - Windows and macOS are now supported and tested platforms; CI runs the full suite on Linux, macOS, and Windows. `pyproject.toml` declares the corresponding `Operating System` classifiers.
 - Directory resolution honors the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/) on every platform, falling back to each platform's native convention when the XDG variables are unset. Five overrides — `PROSE_CRAFT_XDG_DATA_HOME`, `_CONFIG_HOME`, `_CACHE_HOME`, `_STATE_HOME`, `_RUNTIME_DIR` — take precedence over the corresponding `XDG_*` variables, which take precedence over the native default. A value that is empty or relative is ignored, as the specification requires.
@@ -14,8 +16,7 @@
 - `platformdirs` is now a direct dependency. It was already present transitively, so no new package is installed.
 - Promoted `pydantic-settings[toml]` to a direct dependency for typed TOML and environment settings sources.
 - Plugin documentation refers to `<voices-root>` rather than `$XDG_DATA_HOME/prose-craft/voices`, which was only ever accurate on Linux. The voice-backup convention moved from inside the voices root to `<state-root>/prose-craft/backups/`.
-
-**No migration is required.** The voices root is unchanged on Linux and macOS.
+- **No migration is required.** The voices root is unchanged on Linux and macOS.
 
 ### Fixed
 - `prose voice draft` without `--to` no longer leaves a stray `.md` file in the system temp directory. The scratch file is created under the runtime directory and removed when the command finishes, including on failure.
