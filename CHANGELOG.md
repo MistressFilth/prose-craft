@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+- Pre-commit matches CI: pinned upstream `ruff-pre-commit v0.15.20` (lint + format with `--fix`, scoped to `src/prose_craft|tests|scripts|pyproject.toml`) + pinned upstream `ty-pre-commit v0.0.65` (with `--frozen` to prevent `uv.lock` rewrites) + one local `test` hook (`make test` with `GIT_*` env-strip).
+- `pre-commit run --all-files` runs as a final step on every CI matrix leg (ubuntu/macos/windows) so `--no-verify` bypasses surface in PR checks.
+
+### Changed
+- `.pre-commit-config.yaml`: replaced two coarse local hooks (`make-check`, `make-test`) with three upstream + one local repo block.
+- `pyproject.toml`: `pre-commit>=4.6.1` added to `[dependency-groups].dev`.
+
+### Removed
+- The `make-check` and `make-test` coarse local hooks (replaced by per-tool upstream hooks + the scoped `test` hook).
+
 ## [0.5.0] - 2026-08-06
 
 ### Added
