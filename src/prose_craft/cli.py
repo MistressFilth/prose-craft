@@ -207,20 +207,50 @@ def config(
 @_handle_errors
 def voice_list(
     voices_root: Path | None = typer.Option(None, "--voices-root"),
+    origin: str = typer.Option(
+        "all",
+        "--origin",
+        help="Filter by voice origin.",
+        case_sensitive=False,
+    ),
 ) -> None:
-    """List every voice under the active root."""
+    """List voices under the active root (user + shared by default)."""
+    from prose_craft.voices.index import Origin, VoiceIndex
     from prose_craft.voices.io import list_voice_errors
 
-    root = _voices_root_opt(voices_root)
-    summaries = list_voices(root=root)
-    if not summaries:
+    if origin not in ("user", "shared", "all"):
+        raise typer.BadParameter("--origin must be one of: user, shared, all")
+
+    if voices_root is not None:
+        # Explicit override → single-root semantics, same as v0.4.0.
+        root = _voices_root_opt(voices_root)
+        summaries = list_voices(root=root)
+        if not summaries:
+            typer.echo("(no voices found)")
+        else:
+            for s in summaries:
+                typer.echo(f"{s.name}  ({s.updated.isoformat()})")
+        errors = list_voice_errors(root=root)
+        for e in errors:
+            typer.echo(f"error: {e.name}: {e.error}", err=True)
+        return
+
+    # Default → multi-root scan via VoiceIndex.
+    idx = VoiceIndex.build()
+    rows: list[tuple[str, Origin]] = []
+    for name, entry in idx:
+        if origin != "all" and (
+            (origin == "user" and entry.origin is not Origin.USER)
+            or (origin == "shared" and entry.origin is not Origin.SHARED)
+        ):
+            continue
+        rows.append((name, entry.origin))
+    rows.sort(key=lambda r: r[0])
+    if not rows:
         typer.echo("(no voices found)")
-    else:
-        for s in summaries:
-            typer.echo(f"{s.name}  ({s.updated.isoformat()})")
-    errors = list_voice_errors(root=root)
-    for e in errors:
-        typer.echo(f"error: {e.name}: {e.error}", err=True)
+        return
+    for name, o in rows:
+        typer.echo(f"{name} [{o.value}]")
 
 
 @voice_app.command("show")
@@ -231,16 +261,52 @@ def voice_show(
     voices_root: Path | None = typer.Option(None, "--voices-root"),
 ) -> None:
     """Print a voice profile as markdown or raw file."""
-    root = _voices_root_opt(voices_root)
-    if raw:
-        from prose_craft.voices.io import _resolve_voice_path
+    from prose_craft.voices.index import VoiceIndex
+    from prose_craft.voices.location import voice_path
 
-        path = _resolve_voice_path(name, root)
-        if path is None:
-            raise typer.BadParameter(f"voice {name!r} not found at {voice_path(name, root=root)}")
-        typer.echo(path.read_text(encoding="utf-8"))
-        return
-    profile, body = read_voice_raw(name, root=root)
+    if voices_root is not None:
+        # Explicit --voices-root → single-root semantics (matches v0.4.0).
+        root = _voices_root_opt(voices_root)
+        typer.echo(f"[user] {root / name / 'voice.md'}")
+        if raw:
+            from prose_craft.voices.io import _resolve_voice_path
+
+            path = _resolve_voice_path(name, root)
+            if path is None:
+                raise typer.BadParameter(
+                    f"voice {name!r} not found at {voice_path(name, root=root)}"
+                )
+            typer.echo(path.read_text(encoding="utf-8"))
+            return
+        profile, body = read_voice_raw(name, root=root)
+    else:
+        # Multi-root lookup via VoiceIndex. The annotation line surfaces
+        # where the voice actually came from so an operator running the
+        # command does not have to cross-reference `voice list`.
+        #
+        # Validate the name format FIRST via ``voice_path`` (cheap
+        # explicit-root variant — regex check + path join, no scan).
+        # ``VoiceIndex.build()`` does not enforce ``_NAME_RE``; it just
+        # enumerates whatever directories exist. Without this guard an
+        # invalidly named directory like ``123bad/voice.md`` could be
+        # picked up by the index and then read directly via
+        # ``entry.path.read_text()`` under ``--raw``, never raising the
+        # documented ``VoiceNameError``.
+        voice_path(name, root=load_settings().voices_root)
+        entry = VoiceIndex.build().get(name)
+        if entry is not None:
+            typer.echo(f"[{entry.origin.value}] {entry.path}")
+        else:
+            # Name is valid but the voice does not exist anywhere.
+            typer.echo(f"[user] {load_settings().voices_root / name / 'voice.md'}")
+        if raw:
+            if entry is None:
+                raise typer.BadParameter(f"voice {name!r} not found")
+            typer.echo(entry.path.read_text(encoding="utf-8"))
+            return
+        # ``root=None`` lets ``voice_path`` walk every root in
+        # precedence order so a shared voice resolves correctly.
+        profile, body = read_voice_raw(name, root=None)
     typer.echo(f"# {profile.voice}\n")
     typer.echo(f"purpose: {profile.purpose or '(unset)'}")
     typer.echo(f"audience: {profile.audience or '(unset)'}\n")
@@ -771,6 +837,18 @@ def voice_edit(
     ),
 ) -> None:
     """Edit a file in the named voice."""
+    from prose_craft.config import load_settings
+    from prose_craft.voices.index import Origin, VoiceIndex
+    from prose_craft.voices.io import VoiceImportError, import_voice
+
+    shadow_root = voices_root if voices_root is not None else load_settings().voices_root
+    entry = VoiceIndex.build().get(voice)
+    if entry is not None and entry.origin is Origin.SHARED:
+        try:
+            import_voice(voice, root=shadow_root)
+        except VoiceImportError:
+            pass  # already in user root (default or override); no-op
+
     from prose_craft.orchestrator.deps import StylistDeps
     from prose_craft.voices.audience import resolve_audience
 
@@ -839,3 +917,21 @@ def migrate_voices_cmd(
     if report.errors:
         typer.echo(f"errors: {'; '.join(report.errors)}", err=True)
         raise typer.Exit(code=1)
+
+
+@voice_app.command("import")
+@_handle_errors
+def voice_import(
+    name: str = typer.Argument(..., help="Voice name to import from a shared root."),
+    voices_root: Path | None = typer.Option(None, "--voices-root"),
+) -> None:
+    """Copy a shared voice into the user root without editing."""
+    from prose_craft.voices.io import VoiceImportError, import_voice
+
+    shadow_root = voices_root if voices_root is not None else None
+    try:
+        target = import_voice(name, root=shadow_root)
+    except VoiceImportError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+    typer.echo(f"imported {name!r} to {target}")

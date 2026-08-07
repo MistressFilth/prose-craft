@@ -159,6 +159,7 @@ async def test_mcp_list_voices_resource_empty(
 ) -> None:
     """An empty user root shows "(no voices)" — no bundled fallback."""
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    mcp_module._invalidate_index()
     async with mcp_client:
         result = await mcp_client.read_resource("prose://voices")
         assert "(no voices)" in _resource_text(result)
@@ -169,6 +170,7 @@ async def test_mcp_list_voices_resource_with_voice(
     mcp_client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    mcp_module._invalidate_index()
     _write_voice(tmp_path)
     async with mcp_client:
         result = await mcp_client.read_resource("prose://voices")

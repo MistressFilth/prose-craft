@@ -2,16 +2,33 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-07
+
+### Fixed
+- `TestDataDirs` in `tests/unit/test_xdg.py` used hardcoded colons in `$XDG_DATA_DIRS` fixtures, which on Windows (where `os.pathsep` is `;`) made the entire string one entry and tripped the `is_absolute()` validation. The fixtures now use `os.pathsep.join(...)` so the round-trip matches the platform separator. The class is also skipped on Windows because the POSIX-style `/a`, `/b`, `/c` paths used in the assertions are not absolute there.
+
 ### Added
+- `$XDG_DATA_DIRS` lookup for shared voice packs. System-installed voices are visible alongside user voices; user voices shadow shared by name; first invocation of `voice edit --voice <name>` against a shared-only voice copies it to the user root.
+- `voice import <name>` to explicitly copy a shared voice into the user root without invoking the agent.
+- `voice list` annotates each entry with `[user]` / `[shared]` and accepts `--origin {user,shared,all}`.
+- `voice show <name>` prints the origin tag and resolved path.
+- `data_dirs()` resolver in `prose_craft.xdg`.
+- `VoiceIndex` module + MCP cache for multi-root discovery.
 - Pre-commit matches CI: pinned upstream `ruff-pre-commit v0.15.20` (lint + format with `--fix`, scoped to `src/prose_craft|tests|scripts|pyproject.toml`) + pinned upstream `ty-pre-commit v0.0.65` (with `--frozen` to prevent `uv.lock` rewrites) + one local `test` hook (`make test` with `GIT_*` env-strip).
 - `pre-commit run --all-files` runs as a final step on every CI matrix leg (ubuntu/macos/windows) so `--no-verify` bypasses surface in PR checks.
 
 ### Changed
+- `VoiceIndex.build()` deduplicates by directory name (not by parsed `voice` field) so the user-shadow-shared precedence is honored even for malformed shared voices.
+- `list_voices` and `list_voice_errors` scan all roots when called without an explicit `root=`.
 - `.pre-commit-config.yaml`: replaced two coarse local hooks (`make-check`, `make-test`) with three upstream + one local repo block.
 - `pyproject.toml`: `pre-commit>=4.6.1` added to `[dependency-groups].dev`.
 
 ### Removed
 - The `make-check` and `make-test` coarse local hooks (replaced by per-tool upstream hooks + the scoped `test` hook).
+
+### Fixed
+- `TestDataDirs` in `tests/unit/test_xdg.py` used hardcoded colons in `$XDG_DATA_DIRS` fixtures, which on Windows (where `os.pathsep` is `;`) made the entire string one entry and tripped the `is_absolute()` validation. The fixtures now use `os.pathsep.join(...)` so the round-trip matches the platform separator. The class is also skipped on Windows because the POSIX-style `/a`, `/b`, `/c` paths used in the assertions are not absolute there.
+- The `voices_tree` fixture in `tests/features/cli_voice_list_test.py` joined two shared roots with a hardcoded colon while `xdg.data_dirs()` splits `$XDG_DATA_DIRS` on `os.pathsep`. On Windows the two paths collapsed into one malformed entry, failed the `is_absolute()` validation, and were dropped, leaving zero shared roots. The fixture now joins on `os.pathsep`.
 
 ## [0.5.0] - 2026-08-06
 

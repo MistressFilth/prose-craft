@@ -16,19 +16,43 @@ class VoiceNameError(ValueError):
     """Raised when a voice name fails validation."""
 
 
-def voice_path(name: str, *, root: Path | None = None) -> Path:
-    """Return ``<root>/<name>/voice.md`` for a valid voice name.
+def voice_roots() -> list[Path]:
+    """Voices roots in precedence order: user, then shared.
 
-    Voice names must match ``^[a-zA-Z][a-zA-Z0-9-]*$``. Invalid names,
-    including path-traversal attempts, raise :class:`VoiceNameError`.
-    A ``root`` of ``None`` resolves to the configured voices root via
-    :func:`prose_craft.config.load_settings` (deferred import to avoid
-    a module cycle).
+    The user root comes from :func:`prose_craft.config.load_settings`.
+    Shared roots are :func:`prose_craft.xdg.data_dirs` with the
+    ``prose-craft/voices`` suffix appended.
+    """
+    from prose_craft.config import load_settings
+    from prose_craft.xdg import data_dirs
+
+    roots = [load_settings().voices_root]
+    roots.extend(d / "prose-craft" / "voices" for d in data_dirs())
+    return roots
+
+
+def voice_path(name: str, *, root: Path | None = None) -> Path:
+    """Return the resolved path for ``name``.
+
+    When ``root`` is given, return ``<root>/<name>/voice.md`` directly
+    (single-root escape hatch, used by tests and explicit overrides).
+
+    Otherwise walk :func:`voice_roots` in precedence order; the first
+    root containing ``<name>/voice.md`` wins. Raises :class:`VoiceNameError`
+    if the name itself is invalid; absence of the file is signaled by
+    the caller (``read_voice`` raises :class:`VoiceProfileNotFound``).
     """
     if _NAME_RE.fullmatch(name) is None:
         raise VoiceNameError(f"invalid voice name {name!r}: must match [a-zA-Z][a-zA-Z0-9-]*")
-    if root is None:
-        from prose_craft.config import load_settings
+    if root is not None:
+        return root / name / "voice.md"
+    for r in voice_roots():
+        candidate = r / name / "voice.md"
+        if candidate.is_file():
+            return candidate
+    # Fall back to the user-root candidate so existing callers that
+    # synthesize a path even for missing voices (write_voice) get the
+    # expected target location.
+    from prose_craft.config import load_settings
 
-        root = load_settings().voices_root
-    return root / name / "voice.md"
+    return load_settings().voices_root / name / "voice.md"
