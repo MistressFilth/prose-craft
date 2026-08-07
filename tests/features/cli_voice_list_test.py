@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 from typer.testing import CliRunner
 
@@ -16,7 +18,7 @@ def voices_tree(monkeypatch, tmp_path):
     shared_a = tmp_path / "shared_a"
     shared_b = tmp_path / "shared_b"
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
-    monkeypatch.setenv("XDG_DATA_DIRS", f"{shared_a}:{shared_b}")
+    monkeypatch.setenv("XDG_DATA_DIRS", f"{shared_a}{os.pathsep}{shared_b}")
 
     (user / "local").mkdir(parents=True)
     (user / "local" / "voice.md").write_text("---\nvoice: local\n---\n")
