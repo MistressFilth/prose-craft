@@ -63,8 +63,6 @@ from prose_craft.voices.io import (
 )
 from prose_craft.voices.location import VoiceNameError, voice_path
 from prose_craft.voices.model import (
-    AudienceCeiling,
-    AudiencesBlock,
     DictionConfig,
     LexiconConfig,
     RegisterAxes,
@@ -566,37 +564,14 @@ def voice_init(
     voices_root: Path | None = typer.Option(None, "--voices-root"),
 ) -> None:
     """Scaffold a blank voice.md from the template."""
-    from datetime import date
-
-    from prose_craft.data import load_template
+    from prose_craft.voices.io import init_from_template, write_voice
     from prose_craft.voices.location import voice_path
-    from prose_craft.voices.model import VoiceProfile
 
     root = _voices_root_opt(voices_root)
     path = voice_path(name, root=root)
     if path.exists():
         raise typer.BadParameter(f"voice {name!r} already exists at {path}")
-    body = load_template()
-    body = body.replace("<name>", name).replace("<voice-name>", name)
-    body = body.replace("<YYYY-MM-DD>", date.today().isoformat())
-    profile = VoiceProfile(
-        voice=name,
-        created=date.today(),
-        updated=date.today(),
-        register=RegisterAxes(),
-        diction=DictionConfig(),
-        rhythm=RhythmConfig(),
-        syntax=SyntaxConfig(),
-        lexicon=LexiconConfig(),
-        structure=StructureConfig(),
-        audiences=AudiencesBlock(
-            rationale="<why this voice has separate ceilings per audience>",
-            private=AudienceCeiling(severity_ceiling=5, dial_ceiling=1.0),
-            team=AudienceCeiling(severity_ceiling=5, dial_ceiling=1.0),
-            external=AudienceCeiling(severity_ceiling=4, dial_ceiling=1.0),
-        ),
-    )
-    prose_body = body.split("---\n", 2)[2] if body.count("---") >= 2 else "\n"
+    profile, prose_body = init_from_template(name, root=root)
     write_voice(profile, prose_body, root=root)
     typer.echo(f"initialized {path}")
 
@@ -619,12 +594,6 @@ def _voice_compose_repl(name: str, root: Path, model: str) -> None:
     from prose_craft.data import load_template
     from prose_craft.orchestrator.deps import ComposerDeps
     from prose_craft.voices.model import (
-        DictionConfig,
-        LexiconConfig,
-        RegisterAxes,
-        RhythmConfig,
-        StructureConfig,
-        SyntaxConfig,
         VoiceProfile,
     )
 

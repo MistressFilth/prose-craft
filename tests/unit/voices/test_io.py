@@ -161,7 +161,7 @@ def test_voice_init_template_includes_audiences_block():
 
 
 def test_voice_init_scaffolds_audiences_block(tmp_path, monkeypatch):
-    """voice_init writes a voice.md with the scaffolded audiences block."""
+    """voice_init writes a voice.md that matches the bundled template."""
     from typer.testing import CliRunner
     from prose_craft.cli import app
 
@@ -171,10 +171,49 @@ def test_voice_init_scaffolds_audiences_block(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     voice_md = tmp_path / "new-voice" / "voice.md"
     text = voice_md.read_text(encoding="utf-8")
+
+    # Front-matter shape comes from the template, not from defaults.
     assert "audiences:" in text
-    assert "private:" in text
-    assert "team:" in text
-    assert "external:" in text
+    assert "rationale:" in text
+    assert "private:\n    severity_ceiling: 5" in text
+    assert "external:\n    severity_ceiling: 4" in text
+
+    # Placeholders were substituted.
+    assert "<name>" not in text
+    assert "<voice-name>" not in text
+    assert "<YYYY-MM-DD>" not in text
+
+    # Defaults the template doesn't carry must NOT appear.
+    for forbidden in (
+        "fallback_voice:",
+        "closed:",
+        "reason:",
+        "audience_secondary:",
+        "author:",
+    ):
+        assert forbidden not in text, f"{forbidden!r} should not be in rendered voice.md"
+
+
+def test_voice_init_does_not_emit_extras(tmp_path, monkeypatch):
+    """voice_init rendered file has no null lines for fields the
+    template does not declare (fallback_voice, closed, reason,
+    audience_secondary, author)."""
+    from typer.testing import CliRunner
+    from prose_craft.cli import app
+
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    runner = CliRunner()
+    result = runner.invoke(app, ["voice", "init", "new-voice"])
+    assert result.exit_code == 0, result.output
+    text = (tmp_path / "new-voice" / "voice.md").read_text(encoding="utf-8")
+    for forbidden in (
+        "fallback_voice:",
+        "closed:",
+        "reason:",
+        "audience_secondary:",
+        "author:",
+    ):
+        assert forbidden not in text
 
 
 def test_read_voice_missing_raises(tmp_path, monkeypatch):
