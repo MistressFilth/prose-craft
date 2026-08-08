@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-08
+
+### Added
+- `voice delete <name>` removes a voice from the user root. Requires `--force`; without it the command prints the path that would be deleted and exits 2. Shared-only voices (voices that exist only in an `$XDG_DATA_DIRS/prose-craft/voices/` root) are refused even with `--force`. When the same name exists in both a user and a shared root, `--force` removes the user copy and prints a note that the shared copy remains.
+- `prose_craft.voices.io.delete_voice()` library function plus `VoiceDeleteError` exception (already present in `io.py` but previously unused).
+
 ## [0.6.0] - 2026-08-07
 
 ### Fixed

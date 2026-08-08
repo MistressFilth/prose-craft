@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from pydantic import BaseModel
 
-from prose_craft.voices.location import voice_path
+from prose_craft.voices.location import VoiceNameError, voice_path
 
 if TYPE_CHECKING:
     from prose_craft.voices.model import VoiceProfile
@@ -57,6 +57,7 @@ class VoiceError(BaseModel):
 
 
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
+_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9-]*$")
 
 
 def read_voice(name: str, *, root: Path | None = None) -> "VoiceProfile":
@@ -272,4 +273,67 @@ def import_voice(name: str, *, root: Path | None = None) -> Path:
         raise VoiceImportError(f"voice {name!r} not found")
     user_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, user_target)
+    return user_target
+
+
+def delete_voice(name: str, *, root: Path | None = None) -> Path:
+    """Remove ``<root>/<name>/`` from disk. Returns the deleted directory path.
+
+    When ``root=None``, walks :func:`prose_craft.voices.location.voice_roots`
+    (user first, then shared roots). If only a shared root holds the voice,
+    raises :class:`VoiceDeleteError` — shared voices are read-only by
+    convention and ``--force`` cannot override. When both a user and a shared
+    copy exist, only the user copy is removed; the caller is expected to
+    surface the surviving shared path to the operator.
+
+    Raises:
+        VoiceNameError: invalid name format.
+        VoiceProfileNotFound: name is valid but no root contains the voice.
+        VoiceDeleteError: voice is shared-only (no user copy to delete).
+    """
+    import shutil
+
+    from prose_craft.config import load_settings
+    from prose_craft.voices.location import voice_path as _voice_path
+    from prose_craft.voices.location import voice_roots
+
+    # Validate the name first — the not-found path below only checks
+    # `_NAME_RE` indirectly via `voice_path()`, and `Path` arithmetic on
+    # a name with traversal segments (e.g. ``../escape``) would happily
+    # resolve outside ``user_root`` if a sibling directory exists with a
+    # matching ``voice.md``. Reject up front so we never reach the
+    # filesystem arithmetic with an invalid name.
+    if _NAME_RE.fullmatch(name) is None:
+        raise VoiceNameError(f"invalid voice name {name!r}: must match [a-zA-Z][a-zA-Z0-9-]*")
+
+    user_root = root if root is not None else load_settings().voices_root
+    user_target = user_root / name
+
+    # Find every root that actually contains the voice.
+    roots_with_voice: list[Path] = []
+    if root is not None:
+        if (root / name / "voice.md").is_file():
+            roots_with_voice.append(root)
+    else:
+        for r in voice_roots():
+            if (r / name / "voice.md").is_file():
+                roots_with_voice.append(r)
+
+    if not roots_with_voice:
+        # No root had it — surface as not-found using the same wording as
+        # read_voice() so error messages stay consistent.
+        raise VoiceProfileNotFound(
+            f"voice profile {name!r} not found at {_voice_path(name, root=root)}"
+        )
+
+    # "Shared-only" means the user root is not among the roots that
+    # contain the voice. voice_roots() always lists the user root first,
+    # but we check membership rather than position so this stays correct
+    # if the ordering invariant ever changes.
+    if user_root not in roots_with_voice:
+        raise VoiceDeleteError(
+            f"voice {name!r} is shared-only; refusing to delete (root {roots_with_voice[0]})"
+        )
+
+    shutil.rmtree(user_target)
     return user_target

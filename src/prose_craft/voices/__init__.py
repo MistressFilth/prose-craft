@@ -1,7 +1,11 @@
 """Voice profile IO, location, model, check, and shared-voice index."""
 
 from prose_craft.voices.index import Origin, VoiceEntry, VoiceIndex
-from prose_craft.voices.io import VoiceDeleteError, VoiceImportError
+from prose_craft.voices.io import (
+    VoiceDeleteError,
+    VoiceImportError,
+    delete_voice,
+)
 
 __all__ = [
     "Origin",
@@ -9,4 +13,5 @@ __all__ = [
     "VoiceEntry",
     "VoiceImportError",
     "VoiceIndex",
+    "delete_voice",
 ]
