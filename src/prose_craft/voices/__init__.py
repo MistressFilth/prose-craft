@@ -5,6 +5,7 @@ from prose_craft.voices.io import (
     VoiceDeleteError,
     VoiceImportError,
     delete_voice,
+    init_from_template,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "VoiceImportError",
     "VoiceIndex",
     "delete_voice",
+    "init_from_template",
 ]

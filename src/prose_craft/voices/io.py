@@ -150,7 +150,7 @@ def write_voice(
 
     if not isinstance(profile, VoiceProfile):
         profile = VoiceProfile.model_validate(profile)
-    payload = profile.model_dump(mode="json", exclude_none=False)
+    payload = profile.model_dump(mode="json", exclude_none=True, exclude_unset=True)
     front_matter = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     body = prose_body if prose_body.startswith("\n") else "\n" + prose_body
     full = f"---\n{front_matter}---{body}"
@@ -337,3 +337,65 @@ def delete_voice(name: str, *, root: Path | None = None) -> Path:
 
     shutil.rmtree(user_target)
     return user_target
+
+
+def init_from_template(name: str, *, root: Path | None = None) -> tuple["VoiceProfile", str]:
+    """Scaffold a new voice from the bundled template.
+
+    Replaces ``<name>``, ``<voice-name>``, and ``<YYYY-MM-DD>`` in the
+    template's front-matter and prose body, parses the substituted
+    front-matter through :class:`VoiceProfile` (so template drift
+    fails loudly), and returns ``(profile, prose_body)``.
+
+    Does NOT write to disk — the caller invokes :func:`write_voice`
+    after any extra mutation. Does NOT check for existing voices —
+    the caller does so via :func:`prose_craft.voices.location.voice_path`.
+
+    The ``root`` argument is reserved for future template lookup
+    (e.g. per-project overrides); it is currently unused because the
+    template is bundled with the engine.
+
+    Raises:
+        pydantic.ValidationError: the substituted front-matter
+            doesn't match ``VoiceProfile`` (forbidden extras, wrong
+            types, missing required keys).
+        ValueError: a placeholder survives substitution — the
+            template references an unknown token, or the helper's
+            substitution set is incomplete.
+    """
+    from prose_craft.data import load_template
+
+    text = load_template()
+    today = date.today().isoformat()
+    text = text.replace("<name>", name).replace("<voice-name>", name)
+    text = text.replace("<YYYY-MM-DD>", today)
+
+    # Catch template drift in the other direction: an unknown <...>
+    # placeholder would silently survive into the written file. Scan
+    # the whole substituted text — both front-matter and prose body —
+    # before splitting, so a stray placeholder in front-matter fails
+    # the same way as one in the body.
+    #
+    # Token shape: only flag angle brackets whose content has no
+    # whitespace. Real substitution placeholders (``<name>``,
+    # ``<voice-name>``, ``<YYYY-MM-DD>``, ``<bogus-token>``) are
+    # single-word tokens; the intentional user-prompt placeholder
+    # in ``audiences.rationale`` (e.g. ``<why this voice has
+    # separate ceilings per audience>``) is multi-word and is meant
+    # to survive substitution for the composer to fill in.
+    _PLACEHOLDER_TOKEN = re.compile(r"<[^<>\s]+>")
+    for line in text.splitlines():
+        match = _PLACEHOLDER_TOKEN.search(line)
+        if match is not None:
+            raise ValueError(f"unsurrogated placeholder in template: {line!r}")
+
+    match = _FRONTMATTER_RE.match(text)
+    if not match:
+        raise ValueError("voice template has no front-matter; check data/voice_template.md")
+    front_matter_str, prose_body = match.group(1), match.group(2)
+
+    front_matter = yaml.safe_load(front_matter_str) or {}
+    from prose_craft.voices.model import VoiceProfile
+
+    profile = VoiceProfile.model_validate(front_matter)
+    return profile, prose_body

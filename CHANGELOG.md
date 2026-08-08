@@ -1,6 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [0.7.2] - 2026-08-08
+
+### Fixed
+- `voice init` now scaffolds from the bundled `data/voice_template.md` instead of constructing a `VoiceProfile` from in-code defaults; the rendered file matches the template shape (no extraneous `null` lines for `fallback_voice`, `closed`, `reason`, `audience_secondary`, `author`). The compose REPL's fresh-init branch is fixed by the same helper.
 
 ## [0.7.1] - 2026-08-08
 
