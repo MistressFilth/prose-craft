@@ -2,16 +2,19 @@
 
 Path resolution lives in :mod:`prose_craft.paths`.
 
-Configuration loads from three sources, in increasing priority:
+Configuration loads from five sources, in increasing priority:
 
 1. **Defaults baked into the model** — :data:`DEFAULT_MODEL` and the
    XDG-derived :func:`prose_craft.paths.default_voices_root`.
-2. **The XDG config file** — ``$XDG_CONFIG_HOME/prose-craft/config.toml``,
+2. **Shared XDG config files** —
+   ``$XDG_CONFIG_DIRS/prose-craft/config.toml``, each in order
+   (absent entries skipped; earlier entries win).
+3. **The XDG config file** — ``$XDG_CONFIG_HOME/prose-craft/config.toml``,
    applied by :class:`XdgTomlSettingsSource`.
-3. **Environment variables** — ``PROSE_CRAFT_MODEL`` and
+4. **Environment variables** — ``PROSE_CRAFT_MODEL`` and
    ``PROSE_CRAFT_VOICES_ROOT``, applied by
    :class:`LegacyEnvSettingsSource`.
-4. **Explicit arguments** to :func:`load_settings` — win over every
+5. **Explicit arguments** to :func:`load_settings` — win over every
    source above; used by the CLI for ``--model`` / ``--voices-root``.
 
 The schema is strict: unknown keys, wrong-typed values, empty or
@@ -32,9 +35,9 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -147,12 +150,33 @@ class ProseCraftSettings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Order: init → env → toml. Later sources lose to earlier ones."""
+        """Order: init → env → user-toml → shared-toml(s).
+
+        In pydantic-settings, the first source returned has the highest
+        priority. The chain here, from highest to lowest:
+
+        1. ``init_settings`` — explicit kwargs to ``load_settings``
+        2. ``LegacyEnvSettingsSource`` — ``PROSE_CRAFT_*`` env vars
+        3. ``XdgTomlSettingsSource`` — ``$XDG_CONFIG_HOME/prose-craft/config.toml``
+        4. ``XdgSharedTomlSettingsSource`` per config-dir entry —
+           ``$XDG_CONFIG_DIRS/prose-craft/config.toml`` (earlier dir wins)
+
+        Built-in defaults on the model itself fill any field the chain
+        leaves unset.
+        """
         del env_settings, dotenv_settings, file_secret_settings
+        from prose_craft import xdg
+
+        shared = tuple(
+            XdgSharedTomlSettingsSource(settings_cls, d / APP / "config.toml")
+            for d in xdg.config_dirs()
+            if (d / APP / "config.toml").is_file()
+        )
         return (
             init_settings,
             LegacyEnvSettingsSource(settings_cls),
             XdgTomlSettingsSource(settings_cls),
+            *shared,
         )
 
 
@@ -192,6 +216,47 @@ class XdgTomlSettingsSource(TomlConfigSettingsSource):
 
     def __init__(self, settings_cls: type[BaseSettings]) -> None:
         super().__init__(settings_cls, toml_file=config_file())
+
+
+class XdgSharedTomlSettingsSource(TomlConfigSettingsSource):
+    """One ``<XDG_CONFIG_DIRS>/prose-craft/config.toml`` file.
+
+    One instance is constructed per existing config-dir entry returned
+    by :func:`prose_craft.xdg.config_dirs`, chained at the lowest
+    priority in :meth:`ProseCraftSettings.settings_customise_sources`.
+    Order matches ``xdg.config_dirs()`` output — earlier entries win
+    over later ones, so the first config-dir on the search path takes
+    precedence over the next.
+
+    Eagerly validates the parsed TOML dict so that any
+    :class:`pydantic.ValidationError` (unknown keys, wrong-typed
+    values, empty/relative paths) is wrapped as
+    :class:`ConfigurationError` carrying **this** file's path —
+    rather than the user-config path that ``load_settings`` would
+    otherwise attribute it to.
+    """
+
+    def __init__(self, settings_cls: type[BaseSettings], toml_file: Path) -> None:
+        self.toml_file = toml_file
+        try:
+            super().__init__(settings_cls, toml_file=toml_file)
+        except (tomllib.TOMLDecodeError, ValidationError, OSError) as exc:
+            raise ConfigurationError(toml_file, str(exc)) from exc
+
+    def __call__(self) -> dict[str, Any]:
+        try:
+            data = super().__call__()
+            # Validate against the inner model-fields schema directly so
+            # ``BaseSettings``'s custom init doesn't re-enter the source
+            # chain and recurse. ``extra="forbid"`` reproduces the model's
+            # default extras policy; the field validators on ``model`` and
+            # ``paths.voices_root`` run as normal.
+            TypeAdapter(
+                cast("dict[str, Any]", ProseCraftSettings.__pydantic_core_schema__)["schema"]
+            ).validate_python(data, extra="forbid")
+            return data
+        except ValidationError as exc:
+            raise ConfigurationError(self.toml_file, str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------

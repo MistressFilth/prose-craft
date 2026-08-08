@@ -119,3 +119,134 @@ def test_composer_state_is_not_in_the_voices_root(tmp_path: Path) -> None:
 def test_runtime_dir_is_0700_on_posix(tmp_path: Path) -> None:
     created = paths.app_runtime_dir()
     assert stat.S_IMODE(created.stat().st_mode) == 0o700
+
+
+def test_shared_config_sets_baseline_when_user_absent(tmp_path, monkeypatch):
+    """A shared XDG_CONFIG_DIRS file sets model when user config absent."""
+    from prose_craft.config import load_settings
+
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    (shared / "prose-craft").mkdir()
+    (shared / "prose-craft" / "config.toml").write_text(
+        'model = "shared-model"\n', encoding="utf-8"
+    )
+
+    monkeypatch.setenv("XDG_CONFIG_DIRS", str(shared))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user"))
+    monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
+    monkeypatch.delenv("PROSE_CRAFT_VOICES_ROOT", raising=False)
+
+    settings = load_settings()
+    assert settings.model == "shared-model"
+
+
+def test_user_config_overrides_shared_config(tmp_path, monkeypatch):
+    """User XDG_CONFIG_HOME config wins over shared XDG_CONFIG_DIRS."""
+    from prose_craft.config import load_settings
+
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    (shared / "prose-craft").mkdir()
+    (shared / "prose-craft" / "config.toml").write_text(
+        'model = "shared-model"\n', encoding="utf-8"
+    )
+    user = tmp_path / "user"
+    (user / "prose-craft").mkdir(parents=True)
+    (user / "prose-craft" / "config.toml").write_text('model = "user-model"\n', encoding="utf-8")
+
+    monkeypatch.setenv("XDG_CONFIG_DIRS", str(shared))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(user))
+    monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
+
+    settings = load_settings()
+    assert settings.model == "user-model"
+
+
+def test_explicit_kwarg_wins_over_shared_and_user(tmp_path, monkeypatch):
+    """Explicit kwargs to load_settings win over both shared and user."""
+    from prose_craft.config import load_settings
+
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    (shared / "prose-craft").mkdir()
+    (shared / "prose-craft" / "config.toml").write_text(
+        'model = "shared-model"\n', encoding="utf-8"
+    )
+    user = tmp_path / "user"
+    (user / "prose-craft").mkdir(parents=True)
+    (user / "prose-craft" / "config.toml").write_text('model = "user-model"\n', encoding="utf-8")
+
+    monkeypatch.setenv("XDG_CONFIG_DIRS", str(shared))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(user))
+    monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
+
+    settings = load_settings(model="explicit-model")
+    assert settings.model == "explicit-model"
+
+
+def test_invalid_shared_toml_raises_with_path(tmp_path, monkeypatch):
+    """Invalid TOML in a shared config surfaces as ConfigurationError carrying the file path."""
+    import pytest
+    from prose_craft.config import ConfigurationError, load_settings
+
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    (shared / "prose-craft").mkdir()
+    (shared / "prose-craft" / "config.toml").write_text(
+        "this is not valid toml ===\n", encoding="utf-8"
+    )
+
+    monkeypatch.setenv("XDG_CONFIG_DIRS", str(shared))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user"))
+    monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
+    monkeypatch.delenv("PROSE_CRAFT_VOICES_ROOT", raising=False)
+
+    with pytest.raises(ConfigurationError) as excinfo:
+        load_settings()
+    assert excinfo.value.path == shared / "prose-craft" / "config.toml"
+
+
+def test_invalid_shared_keys_raise_with_shared_path(tmp_path, monkeypatch):
+    """Unknown keys in a shared config surface as ConfigurationError carrying the SHARED path."""
+    import pytest
+    from prose_craft.config import ConfigurationError, load_settings
+
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    (shared / "prose-craft").mkdir()
+    (shared / "prose-craft" / "config.toml").write_text(
+        'model = "shared-model"\nunknown_key = "boom"\n', encoding="utf-8"
+    )
+
+    monkeypatch.setenv("XDG_CONFIG_DIRS", str(shared))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user"))
+    monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
+    monkeypatch.delenv("PROSE_CRAFT_VOICES_ROOT", raising=False)
+
+    with pytest.raises(ConfigurationError) as excinfo:
+        load_settings()
+    assert excinfo.value.path == shared / "prose-craft" / "config.toml"
+
+
+def test_first_shared_dir_wins_over_second(tmp_path, monkeypatch):
+    """Multiple XDG_CONFIG_DIRS entries: first wins over second."""
+    from prose_craft.config import load_settings
+
+    first = tmp_path / "first"
+    first.mkdir()
+    (first / "prose-craft").mkdir()
+    (first / "prose-craft" / "config.toml").write_text('model = "first-model"\n', encoding="utf-8")
+    second = tmp_path / "second"
+    second.mkdir()
+    (second / "prose-craft").mkdir()
+    (second / "prose-craft" / "config.toml").write_text(
+        'model = "second-model"\n', encoding="utf-8"
+    )
+
+    monkeypatch.setenv("XDG_CONFIG_DIRS", f"{first}{os.pathsep}{second}")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user"))
+    monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
+
+    settings = load_settings()
+    assert settings.model == "first-model"
