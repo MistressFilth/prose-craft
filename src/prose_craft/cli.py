@@ -16,8 +16,7 @@ Subcommands:
 * ``voice init`` — scaffold a blank voice.md from the template.
 * ``voice compose`` — interactive REPL to design a voice profile.
 * ``voice refine`` — alias of ``voice compose`` for iterating on an
-  existing profile; the ``dim`` argument is reserved for future
-  per-dimension refinement and is ignored today.
+  existing profile.
 * ``voice draft`` — run the voice-stylist agent in draft mode.
 * ``voice edit`` — run the voice-stylist agent in edit mode against a file.
 * ``voice delete`` — remove a voice from the user root; refuses shared-only
