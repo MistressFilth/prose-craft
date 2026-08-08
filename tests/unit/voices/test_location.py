@@ -8,6 +8,7 @@ from prose_craft.voices.location import (
     VoiceNameError,
     _discover_project_root,
     voice_path,
+    voice_roots,
 )
 
 
@@ -103,3 +104,31 @@ def test_discover_handles_missing_cwd(tmp_path: Path) -> None:
     # do not mkdir
 
     assert _discover_project_root(missing) is None
+
+
+def test_voice_roots_includes_project_between_user_and_shared(monkeypatch, tmp_path):
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+    project = tmp_path / ".prose-craft" / "voices"
+    project.mkdir(parents=True)
+
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    monkeypatch.chdir(tmp_path)
+
+    roots = voice_roots()
+
+    assert roots == [user, project, shared / "prose-craft" / "voices"]
+
+
+def test_voice_roots_omits_project_when_no_marker(monkeypatch, tmp_path):
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    monkeypatch.chdir(tmp_path)
+
+    roots = voice_roots()
+
+    assert roots == [user, shared / "prose-craft" / "voices"]
