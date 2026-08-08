@@ -16,8 +16,7 @@ Subcommands:
 * ``voice init`` — scaffold a blank voice.md from the template.
 * ``voice compose`` — interactive REPL to design a voice profile.
 * ``voice refine`` — alias of ``voice compose`` for iterating on an
-  existing profile; the ``dim`` argument is reserved for future
-  per-dimension refinement and is ignored today.
+  existing profile.
 * ``voice draft`` — run the voice-stylist agent in draft mode.
 * ``voice edit`` — run the voice-stylist agent in edit mode against a file.
 * ``voice delete`` — remove a voice from the user root; refuses shared-only
@@ -671,17 +670,9 @@ def voice_compose(
 @_handle_errors
 def voice_refine(
     name: str = typer.Argument(...),
-    dim: str | None = typer.Argument(
-        None,
-        help="Reserved for future per-dimension refinement. Currently ignored.",
-    ),
     voices_root: Path | None = typer.Option(None, "--voices-root"),
 ) -> None:
-    """Refine a voice profile (alias of ``voice compose``).
-
-    Currently walks all dimensions in fixed order; the ``dim`` argument is
-    reserved for a future per-dimension walk and is ignored today.
-    """
+    """Refine a voice profile (alias of ``voice compose``)."""
     voice_compose(name=name, voices_root=voices_root)
 
 

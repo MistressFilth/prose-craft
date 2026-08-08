@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.5] - 2026-08-08
+
+### Changed
+- Removed the unused `dim` argument from `prose voice refine`. The argument was a documented no-op; the command is now a pure alias for `prose voice compose`. Updated the `refine-voice` plugin skill to drop the `[dim]` token from its invocation example.
+
 ## [0.7.4] - 2026-08-08
 
 ### Added

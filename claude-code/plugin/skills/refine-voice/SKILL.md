@@ -1,6 +1,6 @@
 ---
 name: refine-voice
-description: Refine a voice profile dimension.
+description: Refine a voice profile.
 ---
 
-Invoke `prose voice refine <name> [dim]` via Bash with the arguments from $ARGUMENTS.
+Invoke `prose voice refine <name>` via Bash with the arguments from $ARGUMENTS.
