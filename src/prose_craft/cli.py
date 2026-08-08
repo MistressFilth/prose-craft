@@ -671,17 +671,9 @@ def voice_compose(
 @_handle_errors
 def voice_refine(
     name: str = typer.Argument(...),
-    dim: str | None = typer.Argument(
-        None,
-        help="Reserved for future per-dimension refinement. Currently ignored.",
-    ),
     voices_root: Path | None = typer.Option(None, "--voices-root"),
 ) -> None:
-    """Refine a voice profile (alias of ``voice compose``).
-
-    Currently walks all dimensions in fixed order; the ``dim`` argument is
-    reserved for a future per-dimension walk and is ignored today.
-    """
+    """Refine a voice profile (alias of ``voice compose``)."""
     voice_compose(name=name, voices_root=voices_root)
 
 
