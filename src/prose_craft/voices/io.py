@@ -150,7 +150,7 @@ def write_voice(
 
     if not isinstance(profile, VoiceProfile):
         profile = VoiceProfile.model_validate(profile)
-    payload = profile.model_dump(mode="json", exclude_none=False)
+    payload = profile.model_dump(mode="json", exclude_none=True, exclude_unset=True)
     front_matter = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     body = prose_body if prose_body.startswith("\n") else "\n" + prose_body
     full = f"---\n{front_matter}---{body}"
