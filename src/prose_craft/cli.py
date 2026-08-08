@@ -20,8 +20,8 @@ Subcommands:
   per-dimension refinement and is ignored today.
 * ``voice draft`` — run the voice-stylist agent in draft mode.
 * ``voice edit`` — run the voice-stylist agent in edit mode against a file.
-* ``voice delete`` — remove a user voice (preview without ``--force``;
-  shared-only voices refuse even with ``--force``).
+* ``voice delete`` — remove a voice from the user root; refuses shared-only
+  voices even with ``--force``; ``--voices-root`` bypasses the shared check.
 * ``mcp`` — launch the FastMCP server over stdio for MCP hosts.
 * ``migrate voices`` — copy voice profiles from a legacy location to the
   XDG root.
