@@ -165,7 +165,6 @@ class ProseCraftSettings(BaseSettings):
         leaves unset.
         """
         del env_settings, dotenv_settings, file_secret_settings
-        from prose_craft import xdg
 
         shared = tuple(
             XdgSharedTomlSettingsSource(settings_cls, d / APP / "config.toml")
