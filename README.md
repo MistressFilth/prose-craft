@@ -124,15 +124,26 @@ value is rejected. Run `prose config --init` to write the built-in defaults
 to the platform config root — the operation refuses to overwrite an existing
 file and exits 2 instead, leaving your edits untouched.
 
-Precedence is exactly four layers, highest wins:
+**Shared baseline configuration via `$XDG_CONFIG_DIRS`.** For organizations
+shipping a fleet-wide baseline, drop a `prose-craft/config.toml` file into
+any directory listed in `$XDG_CONFIG_DIRS` (default `/etc/xdg`). Each shared
+file is read in order after the built-in/XDG default and before the user
+config. The user config overrides shared; explicit `--model` /
+`--voices-root` flags override everything. Invalid TOML in a shared file
+surfaces as a clear error with the file path — silent skipping is
+intentionally not implemented, because a broken org baseline should fail
+loudly.
+
+Precedence is exactly five layers, highest wins:
 
 ```text
-CLI option > PROSE_CRAFT_* environment variable > config.toml > built-in/XDG default
+CLI option > PROSE_CRAFT_* environment variable > user config.toml > shared config.toml(s) > built-in/XDG default
 ```
 
 So `--model` / `--voices-root` win for a single invocation, `PROSE_CRAFT_MODEL`
-and `PROSE_CRAFT_VOICES_ROOT` win for a session, the TOML file wins for a
-machine, and the XDG default is the fallback.
+and `PROSE_CRAFT_VOICES_ROOT` win for a session, the user TOML file wins for a
+machine, a shared `prose-craft/config.toml` from `$XDG_CONFIG_DIRS` wins for a
+fleet, and the built-in/XDG default is the fallback.
 
 The `version` command is intentionally independent of the config file —
 `prose version` still prints the package version when the TOML is broken or
