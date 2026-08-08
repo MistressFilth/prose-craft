@@ -52,6 +52,7 @@ from prose_craft.config import (
 from prose_craft.orchestrator.root import ProseCraft
 from prose_craft.voices.audience import AudienceNotFoundError
 from prose_craft.voices.io import (
+    VoiceDeleteError,
     VoiceProfileNotFound,
     list_voices,
     read_voice,
@@ -125,6 +126,9 @@ def _handle_errors(func: Any) -> Any:
             # include it, but the handler is registered explicitly so the
             # message lands once on stderr with no traceback and the exit
             # code is 2 — a documented user-input error, not a crash.
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from exc
+        except VoiceDeleteError as exc:
             typer.echo(str(exc), err=True)
             raise typer.Exit(code=2) from exc
         except AudienceNotFoundError as exc:
