@@ -39,6 +39,7 @@ __all__ = [
     "env_path",
     "runtime_dir",
     "state_home",
+    "voices_index_path",
 ]
 
 _OVERRIDE_PREFIX = "PROSE_CRAFT_"
@@ -198,3 +199,15 @@ def state_home() -> Path:
 def runtime_dir() -> Path:
     """User-specific runtime and short-lived files."""
     return _xdg_root("XDG_RUNTIME_DIR", platformdirs.user_runtime_dir)
+
+
+def voices_index_path() -> Path:
+    """``<XDG_CACHE_HOME>/prose-craft/voices-index.json``.
+
+    Mirrors :func:`prose_craft.config.config_file` for the cache
+    subtree. The path is constructed inline (not via
+    :func:`prose_craft.config.config_file`) to avoid a circular
+    import between :mod:`prose_craft.xdg` and
+    :mod:`prose_craft.config`.
+    """
+    return cache_home() / "prose-craft" / "voices-index.json"

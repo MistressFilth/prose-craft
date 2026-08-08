@@ -231,7 +231,7 @@ def voice_list(
         return
 
     # Default → multi-root scan via VoiceIndex.
-    idx = VoiceIndex.build()
+    idx = VoiceIndex.load_or_build()
     rows: list[tuple[str, Origin]] = []
     for name, entry in idx:
         if origin != "all" and (
@@ -563,6 +563,9 @@ def voice_init(
         raise typer.BadParameter(f"voice {name!r} already exists at {path}")
     profile, prose_body = init_from_template(name, root=root)
     write_voice(profile, prose_body, root=root)
+    from prose_craft.voices.io import invalidate_index_cache as _invalidate
+
+    _invalidate()
     typer.echo(f"initialized {path}")
 
 
@@ -600,6 +603,9 @@ def _voice_compose_repl(name: str, root: Path, model: str) -> None:
         # Initialize from template.
         profile, body = init_from_template(name, root=root)
         write_voice(profile, body, root=root)
+        from prose_craft.voices.io import invalidate_index_cache as _invalidate
+
+        _invalidate()
 
     fields = [
         "purpose",
@@ -887,6 +893,9 @@ def voice_import(
     except VoiceImportError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1)
+    from prose_craft.voices.io import invalidate_index_cache as _invalidate
+
+    _invalidate()
     typer.echo(f"imported {name!r} to {target}")
 
 
@@ -948,6 +957,9 @@ def voice_delete(
         raise typer.Exit(code=2)
 
     deleted = _delete(name, root=user_root if voices_root is not None else None)
+    from prose_craft.voices.io import invalidate_index_cache as _invalidate
+
+    _invalidate()
     if len(hits) > 1:
         shared_paths = [r / name for r in hits if r != user_root]
         typer.echo(f"deleted: {deleted}; shared copy at {shared_paths[0]} remains")
