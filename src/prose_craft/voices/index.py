@@ -80,6 +80,13 @@ class VoiceIndex:
         schema mismatch) are silent — fall through to a fresh build.
         Cache write failures are also silent — reads never fail
         because the cache failed.
+
+        Staleness is checked on every cache hit. The worst-case
+        cost is ``R + N`` ``stat()`` calls where ``R`` is the
+        number of roots and ``N`` is the number of cached entries:
+        one per root for the directory mtime, then one per cached
+        entry for the per-file mtime. A root-mtime advance
+        short-circuits the per-entry loop.
         """
         from prose_craft.xdg import voices_index_path
 

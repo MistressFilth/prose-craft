@@ -183,3 +183,37 @@ def test_cache_write_failure_does_not_break_read(tmp_path, monkeypatch):
     names = {name for name, _ in index}
     assert names == {"alpha"}
     assert not cache.exists()
+
+
+def test_load_or_build_rebuilds_on_in_place_file_edit(tmp_path, monkeypatch):
+    """A cached entry whose voice.md mtime has advanced triggers a rebuild."""
+    from prose_craft.voices.index import VoiceIndex
+
+    user = tmp_path / "user" / "prose-craft" / "voices"
+    user.mkdir(parents=True)
+    voice_dir = user / "alpha"
+    voice_dir.mkdir()
+    voice_md = voice_dir / "voice.md"
+    voice_md.write_text("voice: alpha\n", encoding="utf-8")
+
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "user"))
+    monkeypatch.setenv("XDG_DATA_DIRS", "")
+    cache = tmp_path / "cache.json"
+
+    # First call: build and persist.
+    first = VoiceIndex.load_or_build(cache=cache)
+    assert any(name == "alpha" for name, _ in first)
+
+    # Advance only the voice.md file's mtime (root directory mtime unchanged).
+    import os
+
+    new_mtime = (voice_md.stat().st_mtime_ns // 1_000_000_000 + 5) * 1_000_000_000
+    os.utime(voice_md, ns=(new_mtime, new_mtime))
+
+    # Also add a new voice file (still under the unchanged root).
+    (user / "beta").mkdir()
+    (user / "beta" / "voice.md").write_text("voice: beta\n", encoding="utf-8")
+
+    second = VoiceIndex.load_or_build(cache=cache)
+    names = {name for name, _ in second}
+    assert names == {"alpha", "beta"}
