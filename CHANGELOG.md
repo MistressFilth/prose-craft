@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.4] - 2026-08-08
+
+### Added
+- Persistent on-disk voice index at `$XDG_CACHE_HOME/prose-craft/voices-index.json`. CLI invocations and MCP server restarts now reuse the cached walk over `voice_roots()` instead of re-walking on every entry point. Writes (`voice init` / `delete` / `import` / `compose` first-run) invalidate the cache immediately; reads detect staleness via per-root directory mtime and rebuild on miss. Cache load and write failures are silent — reads never fail because the cache failed.
+
 ## [0.7.3] - 2026-08-08
 
 ### Added
