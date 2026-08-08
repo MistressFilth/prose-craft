@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.3] - 2026-08-08
+
+### Added
+- `$XDG_CONFIG_DIRS` lookup for shared configuration. Organizations can ship a `prose-craft/config.toml` baseline in any directory on the search path; users inherit it below their personal `$XDG_CONFIG_HOME` config. Precedence: defaults → shared → user → env → explicit. Invalid TOML in a shared file surfaces as `ConfigurationError` with the offending path — silent skip intentionally not implemented.
+
 ## [0.7.2] - 2026-08-08
 
 ### Fixed
