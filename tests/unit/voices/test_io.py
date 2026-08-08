@@ -276,3 +276,82 @@ def test_delete_voice_removes_user_copy_keeps_shared(monkeypatch, tmp_path):
     assert deleted == user / "alpha"
     assert not (user / "alpha").exists()
     assert (shared / "prose-craft" / "voices" / "alpha").is_dir()
+
+
+def test_init_from_template_substitutes_placeholders(monkeypatch, tmp_path):
+    """init_from_template replaces <name> and <YYYY-MM-DD> in front-matter
+    and <voice-name> in the prose body; parsed profile reflects the same."""
+    from datetime import date
+
+    from prose_craft.voices.io import init_from_template
+
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    profile, body = init_from_template("foo-voice")
+
+    # Placeholders gone from front-matter (profile) and prose body
+    assert "<name>" not in body
+    assert "<voice-name>" not in body
+    assert "<YYYY-MM-DD>" not in body
+    # Body has the substituted name (template carries <voice-name> in the body)
+    assert "foo-voice" in body
+    # The body never had a date placeholder; front-matter substitution is
+    # verified via the parsed profile below.
+    # Profile parses and carries the substituted name + today's date
+    assert profile.voice == "foo-voice"
+    assert profile.created == date.today()
+    assert profile.updated == date.today()
+
+
+def test_init_from_template_rejects_drifted_template(monkeypatch, tmp_path):
+    """A template with a forbidden extra key raises pydantic ValidationError."""
+
+    from pydantic import ValidationError
+
+    from prose_craft.data import DATA_DIR
+    from prose_craft.voices.io import init_from_template
+
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    template = DATA_DIR / "voice_template.md"
+    original = template.read_text(encoding="utf-8")
+    drifted = original.replace("voice: <name>", "voice: <name>\nx_drift: 1")
+    try:
+        template.write_text(drifted, encoding="utf-8")
+        with pytest.raises(ValidationError):
+            init_from_template("foo-voice")
+    finally:
+        template.write_text(original, encoding="utf-8")
+
+
+def test_init_from_template_rejects_surviving_placeholder(monkeypatch, tmp_path):
+    """A template with an unknown <...> placeholder raises ValueError."""
+    from prose_craft.data import DATA_DIR
+    from prose_craft.voices.io import init_from_template
+
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path))
+    template = DATA_DIR / "voice_template.md"
+    original = template.read_text(encoding="utf-8")
+    drifted = original.replace("<voice-name>", "<voice-name>\n# <unknown-token>\n")
+    try:
+        template.write_text(drifted, encoding="utf-8")
+        with pytest.raises(ValueError, match="placeholder"):
+            init_from_template("foo-voice")
+    finally:
+        template.write_text(original, encoding="utf-8")
+
+
+def test_init_from_template_rejects_front_matter_placeholder(monkeypatch):
+    """A placeholder in the front-matter (not the body) also raises ValueError.
+
+    The previous guard scanned only the prose body; an unknown <...>
+    placeholder in front-matter would either parse as a YAML string or
+    raise ``yaml.YAMLError`` — neither of which surfaces the "unknown
+    placeholder" intent the docstring promises. Scan the whole text.
+    """
+    from prose_craft.voices.io import init_from_template
+
+    drifted = (
+        "---\nvoice: <name>\nversion: 1\nx_marker: <bogus-token>\n---\n# <voice-name> — body\n"
+    )
+    monkeypatch.setattr("prose_craft.data.load_template", lambda: drifted)
+    with pytest.raises(ValueError, match="placeholder"):
+        init_from_template("foo-voice")
