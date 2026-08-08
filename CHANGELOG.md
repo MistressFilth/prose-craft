@@ -2,10 +2,6 @@
 
 ## [Unreleased]
 
-### Added
-- `voice delete <name> [--force] [--voices-root PATH]` removes a user voice from the user root. Without `--force` it prints the target path and exits 2 so the command is safe to use as a preview; with `--force` it deletes and exits 0. Shared-only voices refuse even with `--force`. When both user and shared copies exist, only the user copy is removed and the surviving shared path is surfaced to the operator.
-- `delete_voice(name, *, root=None)` library function in `prose_craft.voices.io` returns the deleted directory path and raises `VoiceProfileNotFound` / `VoiceNameError` / `VoiceDeleteError` for the matching user-input classes. `VoiceDeleteError` is now mapped to exit 2 by `_handle_errors`.
-
 ## [0.6.0] - 2026-08-07
 
 ### Fixed

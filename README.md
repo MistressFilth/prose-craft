@@ -6,7 +6,7 @@ A `pydantic-ai` engine for designing and applying prose voices.
 
 - **Typer CLI** (`prose`) with subcommands for analyze, edit,
   architect, tune-diction, voice compose/refine/draft/edit/check/list/
-  show/init/import/delete, migrate, mcp.
+  show/init, migrate, mcp.
 - **FastMCP server** (`prose mcp`) over stdio, exposing the engine as
   tools and resources to any MCP host.
 - **Voice profiles** at the platform voices root (`prose config` resolves it).
@@ -37,9 +37,6 @@ prose edit chapter.md --voice MistressFilth
 
 # Run the composer wizard
 prose voice compose MistressFilth
-
-# Delete a user voice (omit --force to preview; refuse shared-only even with --force)
-prose voice delete MistressFilth --force
 
 # Start the MCP server
 prose mcp
