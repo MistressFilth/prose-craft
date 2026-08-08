@@ -59,17 +59,8 @@ from prose_craft.voices.io import (
     list_voices,
     read_voice,
     read_voice_raw,
-    write_voice,
 )
 from prose_craft.voices.location import VoiceNameError, voice_path
-from prose_craft.voices.model import (
-    DictionConfig,
-    LexiconConfig,
-    RegisterAxes,
-    RhythmConfig,
-    StructureConfig,
-    SyntaxConfig,
-)
 
 __all__ = ["app", "voice_app"]
 
@@ -591,8 +582,8 @@ def _voice_compose_repl(name: str, root: Path, model: str) -> None:
     """Walk a writer through composing a voice, one dimension at a time."""
     from datetime import date
 
-    from prose_craft.data import load_template
     from prose_craft.orchestrator.deps import ComposerDeps
+    from prose_craft.voices.io import init_from_template, write_voice
     from prose_craft.voices.model import (
         VoiceProfile,
     )
@@ -608,20 +599,8 @@ def _voice_compose_repl(name: str, root: Path, model: str) -> None:
         profile, body = read_voice_raw(name, root=root)
     except VoiceProfileNotFound:
         # Initialize from template.
-        body = load_template()
-        body = body.replace("<name>", name).replace("<voice-name>", name)
-        body = body.replace("<YYYY-MM-DD>", date.today().isoformat())
-        profile = VoiceProfile(
-            voice=name,
-            created=date.today(),
-            updated=date.today(),
-            register=RegisterAxes(),
-            diction=DictionConfig(),
-            rhythm=RhythmConfig(),
-            syntax=SyntaxConfig(),
-            lexicon=LexiconConfig(),
-            structure=StructureConfig(),
-        )
+        profile, body = init_from_template(name, root=root)
+        write_voice(profile, body, root=root)
 
     fields = [
         "purpose",
