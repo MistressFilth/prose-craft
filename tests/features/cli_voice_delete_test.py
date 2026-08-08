@@ -121,6 +121,37 @@ def test_delete_user_and_shared_keeps_shared(shared_tree, tmp_path):
     assert (shared / "prose-craft" / "voices" / "shipped").is_dir()
 
 
+def test_delete_user_and_shared_without_force_previews(shared_tree, tmp_path):
+    user, shared = shared_tree
+    # Add a user copy on top of the shared one
+    (user / "shipped" / "voice.md").parent.mkdir(parents=True)
+    (user / "shipped" / "voice.md").write_text(
+        "---\n"
+        "voice: shipped\n"
+        "version: 1\n"
+        "created: '2026-01-01'\n"
+        "updated: '2026-01-01'\n"
+        "register: {}\n"
+        "diction: {}\n"
+        "rhythm: {}\n"
+        "syntax: {}\n"
+        "lexicon: {}\n"
+        "structure: {}\n"
+        "purpose: LOCAL\n"
+        "---\nbody"
+    )
+
+    result = runner.invoke(app, ["voice", "delete", "shipped"])
+
+    assert result.exit_code == 2
+    assert "would delete" in result.output
+    assert "shared" in result.output.lower()
+    assert "--force" in result.output
+    # Neither copy was deleted — the preview branch must not touch disk.
+    assert (user / "shipped" / "voice.md").is_file()
+    assert (shared / "prose-craft" / "voices" / "shipped" / "voice.md").is_file()
+
+
 def test_delete_with_voices_root_override(user_voice):
     # --voices-root bypasses the multi-root walk
     result = runner.invoke(

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from pydantic import BaseModel
 
-from prose_craft.voices.location import voice_path
+from prose_craft.voices.location import VoiceNameError, voice_path
 
 if TYPE_CHECKING:
     from prose_craft.voices.model import VoiceProfile
@@ -57,6 +57,7 @@ class VoiceError(BaseModel):
 
 
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
+_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9-]*$")
 
 
 def read_voice(name: str, *, root: Path | None = None) -> "VoiceProfile":
@@ -296,9 +297,15 @@ def delete_voice(name: str, *, root: Path | None = None) -> Path:
     from prose_craft.voices.location import voice_path as _voice_path
     from prose_craft.voices.location import voice_roots
 
-    # Validate the name first — matches read_voice / write_voice behavior.
-    # voice_path() also validates, but calling it directly here lets us
-    # distinguish "shared-only" from "missing" without an extra scan.
+    # Validate the name first — the not-found path below only checks
+    # `_NAME_RE` indirectly via `voice_path()`, and `Path` arithmetic on
+    # a name with traversal segments (e.g. ``../escape``) would happily
+    # resolve outside ``user_root`` if a sibling directory exists with a
+    # matching ``voice.md``. Reject up front so we never reach the
+    # filesystem arithmetic with an invalid name.
+    if _NAME_RE.fullmatch(name) is None:
+        raise VoiceNameError(f"invalid voice name {name!r}: must match [a-zA-Z][a-zA-Z0-9-]*")
+
     user_root = root if root is not None else load_settings().voices_root
     user_target = user_root / name
 

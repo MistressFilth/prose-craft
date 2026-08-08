@@ -954,16 +954,22 @@ def voice_delete(
 
     Refuses shared-only voices even with --force. Without --force, prints
     the path that would be deleted and exits 2 so the command is safe to
-    use as a preview.
+    use as a preview. With ``--voices-root PATH`` the command operates in
+    single-root mode and bypasses the shared-voice check.
     """
     from prose_craft.config import load_settings
     from prose_craft.voices.io import VoiceDeleteError as _VD
     from prose_craft.voices.io import delete_voice as _delete
+    from prose_craft.voices.location import voice_path as _voice_path
     from prose_craft.voices.location import voice_roots
 
+    # Defense-in-depth: surface invalid names as a CLI error before any
+    # ``user_root / name`` arithmetic. ``_voice_path`` raises
+    # ``VoiceNameError`` directly.
     user_root = (
         _voices_root_opt(voices_root) if voices_root is not None else load_settings().voices_root
     )
+    _voice_path(name, root=user_root if voices_root is not None else None)
     target = user_root / name
 
     # Find every root that holds this voice, so we can (a) detect

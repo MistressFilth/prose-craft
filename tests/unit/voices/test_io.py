@@ -219,6 +219,26 @@ def test_delete_voice_invalid_name_raises(tmp_path):
         delete_voice("../escape", root=tmp_path)
 
 
+def test_delete_voice_rejects_traversal_even_when_sibling_matches(tmp_path):
+    """A traversal name like ``../escape`` must raise VoiceNameError before
+    any rmtree(), even when a sibling of ``user_root`` happens to contain
+    a matching ``voice.md``. Otherwise shutil.rmtree(user_target) would
+    happily delete a directory outside the user root.
+    """
+    user_root = tmp_path / "user"
+    # Sibling of user_root that the traversal name would otherwise resolve
+    # to if the regex check is bypassed.
+    sibling = tmp_path / "escape"
+    (sibling / "voice.md").parent.mkdir(parents=True)
+    (sibling / "voice.md").write_text("---\nvoice: escape\nversion: 1\n---\n", encoding="utf-8")
+
+    with pytest.raises(VoiceNameError):
+        delete_voice("../escape", root=user_root)
+
+    # The sibling directory (and its voice.md) must be untouched.
+    assert (sibling / "voice.md").is_file()
+
+
 def test_delete_voice_refuses_shared_only(monkeypatch, tmp_path):
     user = tmp_path / "user"
     shared = tmp_path / "shared"
