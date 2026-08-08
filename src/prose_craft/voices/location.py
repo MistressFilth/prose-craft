@@ -6,10 +6,34 @@ only the name grammar and the ``<root>/<name>/voice.md`` layout.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
 _NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9-]*$")
+
+
+def _discover_project_root(cwd: Path | None = None) -> Path | None:
+    """Walk from cwd toward filesystem root. Return the closest
+    `<dir>/.prose-craft/voices/` real directory, or None.
+
+    Refuses to ascend through a symlinked directory. Refuses a symlinked
+    marker. Walks until `cur.parent == cur` (filesystem root reached).
+    """
+    start = cwd if cwd is not None else Path(os.getcwd())
+    if not start.is_dir():
+        return None
+    cur = start
+    while True:
+        if cur.is_symlink():
+            return None
+        marker = cur / ".prose-craft" / "voices"
+        if marker.is_dir() and not marker.is_symlink():
+            return marker
+        parent = cur.parent
+        if parent == cur:
+            return None  # filesystem root reached
+        cur = parent
 
 
 class VoiceNameError(ValueError):
@@ -17,16 +41,22 @@ class VoiceNameError(ValueError):
 
 
 def voice_roots() -> list[Path]:
-    """Voices roots in precedence order: user, then shared.
+    """Voices roots in precedence order: user, project, then shared.
 
     The user root comes from :func:`prose_craft.config.load_settings`.
-    Shared roots are :func:`prose_craft.xdg.data_dirs` with the
-    ``prose-craft/voices`` suffix appended.
+    The project root is discovered from the current working directory by
+    :func:`_discover_project_root` — ``<dir>/.prose-craft/voices/`` at the
+    closest ancestor that contains one. Shared roots are
+    :func:`prose_craft.xdg.data_dirs` with the ``prose-craft/voices`` suffix
+    appended.
     """
     from prose_craft.config import load_settings
     from prose_craft.xdg import data_dirs
 
     roots = [load_settings().voices_root]
+    project = _discover_project_root()
+    if project is not None:
+        roots.append(project)
     roots.extend(d / "prose-craft" / "voices" for d in data_dirs())
     return roots
 

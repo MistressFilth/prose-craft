@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-08
+
+### Added
+- Per-project voice roots discovered from the current working directory. A repository can ship its own voices by creating `<dir>/.prose-craft/voices/`; the closest such directory on the walk from CWD to the filesystem root is inserted into `voice_roots()` between the user root and the shared roots (`XDG_DATA_DIRS`). Backward-compatible — repositories without a `.prose-craft/voices/` ancestor see no behavior change. Symlinks on the walk path or at the marker itself are refused. Closes #27.
+
 ## [0.7.0] - 2026-08-08
 
 ### Added

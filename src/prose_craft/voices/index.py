@@ -33,6 +33,10 @@ class VoiceIndex:
         entries: dict[str, VoiceEntry] = {}
         user_root = voice_roots()[0]
         for i, root in enumerate(voice_roots()):
+            # Project-root voices intentionally tag as Origin.SHARED until
+            # Origin.PROJECT lands — deferred per the per-project voice roots
+            # design (spec 2026-08-08-per-project-voice-roots-design.md
+            # "Out of scope").
             origin = Origin.USER if root == user_root else Origin.SHARED
             if not root.exists():
                 continue

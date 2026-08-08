@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from prose_craft.voices.location import VoiceNameError, voice_path
+from prose_craft.voices.location import (
+    VoiceNameError,
+    _discover_project_root,
+    voice_path,
+    voice_roots,
+)
 
 
 def test_voice_path_validates_name(tmp_voices_root: Path) -> None:
@@ -43,3 +48,87 @@ def test_get_voices_root_is_gone() -> None:
     from prose_craft.voices import location
 
     assert not hasattr(location, "get_voices_root")
+
+
+def test_discover_finds_closest_project_root(tmp_path: Path) -> None:
+    (tmp_path / ".prose-craft" / "voices").mkdir(parents=True)
+    cwd = tmp_path / "sub" / "deep"
+    cwd.mkdir(parents=True)
+
+    assert _discover_project_root(cwd) == tmp_path / ".prose-craft" / "voices"
+
+
+def test_discover_no_marker_returns_none(tmp_path: Path) -> None:
+    cwd = tmp_path / "sub"
+    cwd.mkdir()
+
+    assert _discover_project_root(cwd) is None
+
+
+def test_discover_closest_wins_over_ancestor(tmp_path: Path) -> None:
+    (tmp_path / ".prose-craft" / "voices").mkdir(parents=True)
+    (tmp_path / "sub" / ".prose-craft" / "voices").mkdir(parents=True)
+    cwd = tmp_path / "sub"
+
+    assert _discover_project_root(cwd) == tmp_path / "sub" / ".prose-craft" / "voices"
+
+
+def test_discover_refuses_symlinked_parent(tmp_path: Path) -> None:
+    (tmp_path / "parent" / ".prose-craft" / "voices").mkdir(parents=True)
+    (tmp_path / "link").symlink_to(tmp_path / "parent")
+    cwd = tmp_path / "link" / "sub"
+    cwd.mkdir(parents=True)
+
+    assert _discover_project_root(cwd) is None
+
+
+def test_discover_refuses_symlinked_marker(tmp_path: Path) -> None:
+    real = tmp_path / ".prose-craft" / "voices_real"
+    real.mkdir(parents=True)
+    (tmp_path / ".prose-craft" / "voices").symlink_to(real)
+
+    assert _discover_project_root(tmp_path) is None
+
+
+def test_discover_walks_past_intermediate_dirs(tmp_path: Path) -> None:
+    (tmp_path / "a" / "b" / "c" / ".prose-craft" / "voices").mkdir(parents=True)
+    cwd = tmp_path / "a" / "b" / "c" / "d" / "e" / "f"
+    cwd.mkdir(parents=True)
+
+    assert _discover_project_root(cwd) == tmp_path / "a" / "b" / "c" / ".prose-craft" / "voices"
+
+
+def test_discover_handles_missing_cwd(tmp_path: Path) -> None:
+    # CWD that doesn't exist anymore — return None, no exception.
+    missing = tmp_path / "deleted"
+    # do not mkdir
+
+    assert _discover_project_root(missing) is None
+
+
+def test_voice_roots_includes_project_between_user_and_shared(monkeypatch, tmp_path: Path) -> None:
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+    project = tmp_path / ".prose-craft" / "voices"
+    project.mkdir(parents=True)
+
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    monkeypatch.chdir(tmp_path)
+
+    roots = voice_roots()
+
+    assert roots == [user, project, shared / "prose-craft" / "voices"]
+
+
+def test_voice_roots_omits_project_when_no_marker(monkeypatch, tmp_path: Path) -> None:
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    monkeypatch.chdir(tmp_path)
+
+    roots = voice_roots()
+
+    assert roots == [user, shared / "prose-craft" / "voices"]

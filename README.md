@@ -171,6 +171,29 @@ origin and resolved path alongside the profile.
 Distribution convention: package `<name>/voice.md` under
 `<system-data-dir>/prose-craft/voices/<name>/`.
 
+## Per-project voice roots
+
+A project can ship its own voices by creating `.prose-craft/voices/` at any
+directory in its tree. prose-craft walks from the current working directory
+toward the filesystem root and uses the closest such directory, falling
+between the user root and the system shared roots in the resolution chain.
+Symlinks on the walk path or at the marker itself are refused.
+
+Full precedence:
+
+1. User root (`$XDG_DATA_HOME/prose-craft/voices`).
+2. Closest `.prose-craft/voices/` ancestor of cwd.
+3. Each `$XDG_DATA_DIRS[i]/prose-craft/voices` in spec order — see
+   "Shared voice packs" above.
+
+A project voice of the same name shadows a shared one but loses to a user
+voice. `--voices-root PATH` overrides every entry above for a single
+invocation, so operators can pin the resolution without changing the
+working directory.
+
+This lets a project ship a specific voice without affecting the operator's
+global library.
+
 ## Migrating from the old plugin
 
 If you have existing voices in `${CLAUDE_PLUGIN_DATA}/voices/`, copy
