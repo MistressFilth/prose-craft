@@ -25,6 +25,7 @@ def test_voice_roots_user_first(monkeypatch, tmp_path):
     shared = tmp_path / "shared"
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
     monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    monkeypatch.chdir(tmp_path)
     roots = location.voice_roots()
     assert roots[0] == user
     assert roots[1] == shared / "prose-craft" / "voices"
@@ -33,6 +34,7 @@ def test_voice_roots_user_first(monkeypatch, tmp_path):
 def test_voice_roots_no_shared(monkeypatch, tmp_path):
     monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(tmp_path / "user"))
     monkeypatch.delenv("XDG_DATA_DIRS", raising=False)
+    monkeypatch.chdir(tmp_path)
     roots = location.voice_roots()
     assert roots == [
         tmp_path / "user",
