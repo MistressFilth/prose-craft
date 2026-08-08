@@ -216,6 +216,10 @@ def test_config_dirs_default_when_unset(monkeypatch):
     assert xdg.config_dirs() == [Path("/etc/xdg")]
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX-style /a, /b, /c paths are not absolute on Windows",
+)
 def test_config_dirs_parses_multiple_entries(monkeypatch):
     """config_dirs() splits on os.pathsep and returns one Path per entry."""
     from prose_craft import xdg
@@ -224,6 +228,10 @@ def test_config_dirs_parses_multiple_entries(monkeypatch):
     assert xdg.config_dirs() == [Path("/etc/xdg/prose"), Path("/opt/share/prose-craft")]
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX-style /a, /b, /c paths are not absolute on Windows",
+)
 def test_config_dirs_drops_invalid_entries(monkeypatch):
     """config_dirs() drops relative or empty entries per spec validity rule."""
     from prose_craft import xdg
@@ -240,6 +248,10 @@ def test_config_dirs_empty_after_drop_falls_back_to_default(monkeypatch):
     assert xdg.config_dirs() == [Path("/etc/xdg")]
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows' Path.expanduser() reads USERPROFILE, not HOME",
+)
 def test_env_path_for_config_dirs_expands_user(monkeypatch, tmp_path):
     """Tilde-expansion works for entries that begin with ~/."""
     from prose_craft import xdg
