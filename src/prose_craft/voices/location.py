@@ -6,10 +6,34 @@ only the name grammar and the ``<root>/<name>/voice.md`` layout.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
 _NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9-]*$")
+
+
+def _discover_project_root(cwd: Path | None = None) -> Path | None:
+    """Walk from cwd toward filesystem root. Return the closest
+    `<dir>/.prose-craft/voices/` real directory, or None.
+
+    Refuses to ascend through a symlinked directory. Refuses a symlinked
+    marker. Walks until `cur.parent == cur` (filesystem root reached).
+    """
+    start = cwd if cwd is not None else Path(os.getcwd())
+    if not start.is_dir():
+        return None
+    cur = start
+    while True:
+        if cur.is_symlink():
+            return None
+        marker = cur / ".prose-craft" / "voices"
+        if marker.is_dir() and not marker.is_symlink():
+            return marker
+        parent = cur.parent
+        if parent == cur:
+            return None  # filesystem root reached
+        cur = parent
 
 
 class VoiceNameError(ValueError):

@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from prose_craft.voices.location import VoiceNameError, voice_path
+from prose_craft.voices.location import (
+    VoiceNameError,
+    _discover_project_root,
+    voice_path,
+)
 
 
 def test_voice_path_validates_name(tmp_voices_root: Path) -> None:
@@ -43,3 +47,59 @@ def test_get_voices_root_is_gone() -> None:
     from prose_craft.voices import location
 
     assert not hasattr(location, "get_voices_root")
+
+
+def test_discover_finds_closest_project_root(tmp_path: Path) -> None:
+    (tmp_path / ".prose-craft" / "voices").mkdir(parents=True)
+    cwd = tmp_path / "sub" / "deep"
+    cwd.mkdir(parents=True)
+
+    assert _discover_project_root(cwd) == tmp_path / ".prose-craft" / "voices"
+
+
+def test_discover_no_marker_returns_none(tmp_path: Path) -> None:
+    cwd = tmp_path / "sub"
+    cwd.mkdir()
+
+    assert _discover_project_root(cwd) is None
+
+
+def test_discover_closest_wins_over_ancestor(tmp_path: Path) -> None:
+    (tmp_path / ".prose-craft" / "voices").mkdir(parents=True)
+    (tmp_path / "sub" / ".prose-craft" / "voices").mkdir(parents=True)
+    cwd = tmp_path / "sub"
+
+    assert _discover_project_root(cwd) == tmp_path / "sub" / ".prose-craft" / "voices"
+
+
+def test_discover_refuses_symlinked_parent(tmp_path: Path) -> None:
+    (tmp_path / "parent" / ".prose-craft" / "voices").mkdir(parents=True)
+    (tmp_path / "link").symlink_to(tmp_path / "parent")
+    cwd = tmp_path / "link" / "sub"
+    cwd.mkdir(parents=True)
+
+    assert _discover_project_root(cwd) is None
+
+
+def test_discover_refuses_symlinked_marker(tmp_path: Path) -> None:
+    real = tmp_path / ".prose-craft" / "voices_real"
+    real.mkdir(parents=True)
+    (tmp_path / ".prose-craft" / "voices").symlink_to(real)
+
+    assert _discover_project_root(tmp_path) is None
+
+
+def test_discover_walks_past_intermediate_dirs(tmp_path: Path) -> None:
+    (tmp_path / "a" / "b" / "c" / ".prose-craft" / "voices").mkdir(parents=True)
+    cwd = tmp_path / "a" / "b" / "c" / "d" / "e" / "f"
+    cwd.mkdir(parents=True)
+
+    assert _discover_project_root(cwd) == tmp_path / "a" / "b" / "c" / ".prose-craft" / "voices"
+
+
+def test_discover_handles_missing_cwd(tmp_path: Path) -> None:
+    # CWD that doesn't exist anymore — return None, no exception.
+    missing = tmp_path / "deleted"
+    # do not mkdir
+
+    assert _discover_project_root(missing) is None
