@@ -20,6 +20,8 @@ Subcommands:
   per-dimension refinement and is ignored today.
 * ``voice draft`` — run the voice-stylist agent in draft mode.
 * ``voice edit`` — run the voice-stylist agent in edit mode against a file.
+* ``voice delete`` — remove a user voice (preview without ``--force``;
+  shared-only voices refuse even with ``--force``).
 * ``mcp`` — launch the FastMCP server over stdio for MCP hosts.
 * ``migrate voices`` — copy voice profiles from a legacy location to the
   XDG root.
@@ -939,3 +941,62 @@ def voice_import(
         typer.echo(str(exc), err=True)
         raise typer.Exit(1)
     typer.echo(f"imported {name!r} to {target}")
+
+
+@voice_app.command("delete")
+@_handle_errors
+def voice_delete(
+    name: str = typer.Argument(..., help="Voice name."),
+    force: bool = typer.Option(False, "--force", help="Confirm deletion."),
+    voices_root: Path | None = typer.Option(None, "--voices-root"),
+) -> None:
+    """Remove a voice from the user root.
+
+    Refuses shared-only voices even with --force. Without --force, prints
+    the path that would be deleted and exits 2 so the command is safe to
+    use as a preview.
+    """
+    from prose_craft.config import load_settings
+    from prose_craft.voices.io import VoiceDeleteError as _VD
+    from prose_craft.voices.io import delete_voice as _delete
+    from prose_craft.voices.location import voice_roots
+
+    user_root = (
+        _voices_root_opt(voices_root) if voices_root is not None else load_settings().voices_root
+    )
+    target = user_root / name
+
+    # Find every root that holds this voice, so we can (a) detect
+    # shared-only and (b) warn when both copies exist.
+    roots = [user_root] if voices_root is not None else voice_roots()
+    hits = [r for r in roots if (r / name / "voice.md").is_file()]
+
+    if not hits:
+        # Defer to delete_voice() so the error message + VoiceProfileNotFound
+        # wiring are identical to the library path.
+        _delete(name, root=user_root if voices_root is not None else None)
+        return  # unreachable; _delete raises
+
+    user_hit = user_root in hits
+
+    if not user_hit:
+        # Shared-only — refuse regardless of --force.
+        raise _VD(f"voice {name!r} is shared-only; refusing to delete (root {hits[0]})")
+
+    if not force:
+        shared_note = ""
+        if len(hits) > 1:
+            shared_paths = [r / name for r in hits if r != user_root]
+            shared_note = f"; shared copy at {shared_paths[0]} remains"
+        typer.echo(
+            f"would delete: {target}{shared_note} (pass --force to confirm)",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    deleted = _delete(name, root=user_root if voices_root is not None else None)
+    if len(hits) > 1:
+        shared_paths = [r / name for r in hits if r != user_root]
+        typer.echo(f"deleted: {deleted}; shared copy at {shared_paths[0]} remains")
+    else:
+        typer.echo(f"deleted: {deleted}")
