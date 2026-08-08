@@ -5,7 +5,9 @@ from pathlib import Path
 import pytest
 
 from prose_craft.voices.io import (
+    VoiceDeleteError,
     VoiceProfileNotFound,
+    delete_voice,
     list_voices,
     read_voice,
     read_voice_file,
@@ -191,3 +193,66 @@ def test_read_voice_missing_raises(tmp_path, monkeypatch):
         io.read_voice_raw("does-not-exist")
 
     assert io.list_voices() == []
+
+
+def test_delete_voice_removes_user_directory(tmp_path):
+    (tmp_path / "alpha" / "voice.md").parent.mkdir(parents=True)
+    (tmp_path / "alpha" / "voice.md").write_text(
+        "---\nvoice: alpha\nversion: 1\n---\n", encoding="utf-8"
+    )
+    # Add a companion file to confirm the whole directory goes, not just voice.md
+    (tmp_path / "alpha" / "notes.txt").write_text("companion")
+
+    deleted = delete_voice("alpha", root=tmp_path)
+
+    assert deleted == tmp_path / "alpha"
+    assert not (tmp_path / "alpha").exists()
+
+
+def test_delete_voice_missing_raises(tmp_path):
+    with pytest.raises(VoiceProfileNotFound):
+        delete_voice("ghost", root=tmp_path)
+
+
+def test_delete_voice_invalid_name_raises(tmp_path):
+    with pytest.raises(VoiceNameError):
+        delete_voice("../escape", root=tmp_path)
+
+
+def test_delete_voice_refuses_shared_only(monkeypatch, tmp_path):
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    (shared / "prose-craft" / "voices" / "shipped" / "voice.md").parent.mkdir(parents=True)
+    (shared / "prose-craft" / "voices" / "shipped" / "voice.md").write_text(
+        "---\nvoice: shipped\nversion: 1\n---\n", encoding="utf-8"
+    )
+
+    with pytest.raises(VoiceDeleteError):
+        delete_voice("shipped")
+
+    assert (shared / "prose-craft" / "voices" / "shipped").is_dir()
+
+
+def test_delete_voice_removes_user_copy_keeps_shared(monkeypatch, tmp_path):
+    user = tmp_path / "user"
+    shared = tmp_path / "shared"
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user))
+    monkeypatch.setenv("XDG_DATA_DIRS", str(shared))
+    # User copy
+    (user / "alpha" / "voice.md").parent.mkdir(parents=True)
+    (user / "alpha" / "voice.md").write_text(
+        "---\nvoice: alpha\nversion: 1\n---\n", encoding="utf-8"
+    )
+    # Shared copy
+    (shared / "prose-craft" / "voices" / "alpha" / "voice.md").parent.mkdir(parents=True)
+    (shared / "prose-craft" / "voices" / "alpha" / "voice.md").write_text(
+        "---\nvoice: alpha\nversion: 1\n---\n", encoding="utf-8"
+    )
+
+    deleted = delete_voice("alpha")
+
+    assert deleted == user / "alpha"
+    assert not (user / "alpha").exists()
+    assert (shared / "prose-craft" / "voices" / "alpha").is_dir()
