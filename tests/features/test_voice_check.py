@@ -110,6 +110,9 @@ def test_compose_repl_fresh_init_uses_template(monkeypatch, tmp_path: Path) -> N
     assert match is not None, "voice.md is missing a YAML front-matter"
     front_matter = yaml.safe_load(match.group(1))
     audiences = front_matter.get("audiences") or {}
-    assert "private" in audiences, audiences
-    assert "team" in audiences, audiences
-    assert "external" in audiences, audiences
+    assert isinstance(audiences.get("private"), dict), audiences
+    assert isinstance(audiences.get("team"), dict), audiences
+    assert isinstance(audiences.get("external"), dict), audiences
+    # Confirm the template's severity_ceiling actually survives (catches exclude_unset regression)
+    assert audiences["private"].get("severity_ceiling") == 5, audiences
+    assert audiences["external"].get("severity_ceiling") == 4, audiences

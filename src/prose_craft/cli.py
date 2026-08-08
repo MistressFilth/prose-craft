@@ -556,7 +556,6 @@ def voice_init(
 ) -> None:
     """Scaffold a blank voice.md from the template."""
     from prose_craft.voices.io import init_from_template, write_voice
-    from prose_craft.voices.location import voice_path
 
     root = _voices_root_opt(voices_root)
     path = voice_path(name, root=root)
