@@ -206,3 +206,43 @@ class TestDataDirs:
     def test_returns_default_when_only_invalid(self, monkeypatch):
         monkeypatch.setenv("XDG_DATA_DIRS", "relative:../up")
         assert xdg.data_dirs() == [Path("/usr/local/share"), Path("/usr/share")]
+
+
+def test_config_dirs_default_when_unset(monkeypatch):
+    """config_dirs() returns ["/etc/xdg"] when XDG_CONFIG_DIRS is unset."""
+    from prose_craft import xdg
+
+    monkeypatch.delenv("XDG_CONFIG_DIRS", raising=False)
+    assert xdg.config_dirs() == [Path("/etc/xdg")]
+
+
+def test_config_dirs_parses_multiple_entries(monkeypatch):
+    """config_dirs() splits on os.pathsep and returns one Path per entry."""
+    from prose_craft import xdg
+
+    monkeypatch.setenv("XDG_CONFIG_DIRS", "/etc/xdg/prose:/opt/share/prose-craft")
+    assert xdg.config_dirs() == [Path("/etc/xdg/prose"), Path("/opt/share/prose-craft")]
+
+
+def test_config_dirs_drops_invalid_entries(monkeypatch):
+    """config_dirs() drops relative or empty entries per spec validity rule."""
+    from prose_craft import xdg
+
+    monkeypatch.setenv("XDG_CONFIG_DIRS", "/etc/xdg/prose:relative/path::/opt/share")
+    assert xdg.config_dirs() == [Path("/etc/xdg/prose"), Path("/opt/share")]
+
+
+def test_config_dirs_empty_after_drop_falls_back_to_default(monkeypatch):
+    """If all entries are invalid, fall back to the spec default."""
+    from prose_craft import xdg
+
+    monkeypatch.setenv("XDG_CONFIG_DIRS", "relative/path::")
+    assert xdg.config_dirs() == [Path("/etc/xdg")]
+
+
+def test_env_path_for_config_dirs_expands_user(monkeypatch, tmp_path):
+    """Tilde-expansion works for entries that begin with ~/."""
+    from prose_craft import xdg
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert xdg.env_path_for_config_dirs("~/prose-config") == tmp_path / "prose-config"
