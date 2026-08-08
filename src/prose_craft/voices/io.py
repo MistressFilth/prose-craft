@@ -399,3 +399,17 @@ def init_from_template(name: str, *, root: Path | None = None) -> tuple["VoicePr
 
     profile = VoiceProfile.model_validate(front_matter)
     return profile, prose_body
+
+
+def invalidate_index_cache() -> None:
+    """Delete the persistent on-disk voice index cache.
+
+    Called by every write path (``voice init``, ``voice delete``,
+    ``voice import``, ``voice compose`` fresh-init). Next read
+    rebuilds. Module-level in-memory caches in MCP and any other
+    long-lived caller should be invalidated by the caller alongside
+    this call.
+    """
+    from prose_craft.voices.index import VoiceIndex
+
+    VoiceIndex.invalidate_cache()

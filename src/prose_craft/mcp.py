@@ -38,6 +38,13 @@ def _get_index() -> VoiceIndex:
 def _invalidate_index() -> None:
     global _index_cache
     _index_cache = None
+    # Co-invalidate the persistent on-disk cache so the next ``load_or_build``
+    # (e.g. via ``voice list``) rebuilds. Any MCP handler that mutates a
+    # voice should call this; the persistent side is cleared here so
+    # callers don't have to remember to do both.
+    from prose_craft.voices.io import invalidate_index_cache
+
+    invalidate_index_cache()
 
 
 def _craft(settings: ProseCraftSettings | None = None) -> ProseCraft:

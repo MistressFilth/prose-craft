@@ -250,3 +250,43 @@ def test_first_shared_dir_wins_over_second(tmp_path, monkeypatch):
 
     settings = load_settings()
     assert settings.model == "first-model"
+
+
+def test_voice_init_invalidates_persistent_cache(tmp_path, monkeypatch):
+    """Building the cache, then running voice init, then re-listing sees the new voice."""
+    from prose_craft import xdg
+
+    user_cfg = tmp_path / "user_cfg"
+    user_cfg.mkdir()
+    user_voices = tmp_path / "user_voices"
+    user_voices.mkdir()
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(user_cfg))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(cache_dir))
+    monkeypatch.setenv("XDG_DATA_DIRS", "")
+    monkeypatch.setenv("PROSE_CRAFT_VOICES_ROOT", str(user_voices))
+    monkeypatch.delenv("PROSE_CRAFT_MODEL", raising=False)
+
+    cache_file = xdg.voices_index_path()
+    assert not cache_file.exists()
+
+    # First list builds and persists the cache.
+    from typer.testing import CliRunner
+    from prose_craft.cli import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["voice", "list"])
+    assert result.exit_code == 0, result.output
+    assert cache_file.exists()
+
+    # Init a new voice. The write should invalidate the cache.
+    result = runner.invoke(app, ["voice", "init", "new-voice"])
+    assert result.exit_code == 0, result.output
+    assert not cache_file.exists(), "cache should be invalidated by voice init"
+
+    # Next list rebuilds the cache and includes the new voice.
+    result = runner.invoke(app, ["voice", "list"])
+    assert result.exit_code == 0, result.output
+    assert "new-voice" in result.output
