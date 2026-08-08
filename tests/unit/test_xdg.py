@@ -258,3 +258,24 @@ def test_env_path_for_config_dirs_expands_user(monkeypatch, tmp_path):
 
     monkeypatch.setenv("HOME", str(tmp_path))
     assert xdg.env_path_for_config_dirs("~/prose-config") == tmp_path / "prose-config"
+
+
+# ---------------------------------------------------------------------------
+# voices_index_path: persistent voice index under the cache subtree
+# ---------------------------------------------------------------------------
+
+
+def test_voices_index_path_under_cache_home(monkeypatch, tmp_path):
+    """voices_index_path() returns <XDG_CACHE_HOME>/prose-craft/voices-index.json."""
+    from prose_craft import xdg
+
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    assert xdg.voices_index_path() == tmp_path / "prose-craft" / "voices-index.json"
+
+
+def test_voices_index_path_export():
+    """voices_index_path is exported via xdg.__all__."""
+    from prose_craft import xdg
+
+    assert "voices_index_path" in xdg.__all__
+    assert hasattr(xdg, "voices_index_path")
