@@ -7,16 +7,13 @@ from prose_craft.analysis.cohesion import (
 
 def test_count_connectives_basic():
     text = "Because it rained, we stayed inside. Then we ate."
-    counts = count_connectives(
-        text,
-        ["Because", "it", "rained", "we", "stayed", "inside", "Then", "we", "ate"],
-    )
+    counts = count_connectives(text)
     assert counts.causal >= 1
     assert counts.temporal >= 1
 
 
 def test_count_connectives_empty():
-    counts = count_connectives("", [])
+    counts = count_connectives("")
     assert counts.causal == 0
     assert counts.temporal == 0
     assert counts.additive == 0

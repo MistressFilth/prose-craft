@@ -67,7 +67,7 @@ def analyze_prose(text: str) -> ProseMetrics | None:
     poly = sum(1 for s in syllables if s >= 3) / len(syllables) * 100 if syllables else 0.0
 
     flesch = flesch_reading_ease(mean_len, avg_syl)
-    connective_counts = count_connectives(text, words)
+    connective_counts = count_connectives(text)
     conn_density = connectives_per_100(connective_counts, len(words))
     mono = len(monotony_zones(sent_lengths))
 
