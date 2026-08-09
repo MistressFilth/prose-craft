@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.6] - 2026-08-08
+
+### Fixed
+- MCP server's `No module named 'rich.traceback'` failure when running the prose-analyzer tool. `rich` is now a direct dependency (declared in `pyproject.toml`) instead of being pulled in transitively via `typer`. Affects MCP server envs and `uv-tool install` envs where the transitive chain may not resolve. Engine already imports `rich.console` and `rich.markdown` directly, so this fixes a fragile dep relationship rather than adding a new use.
+
 ## [0.7.5] - 2026-08-08
 
 ### Changed
