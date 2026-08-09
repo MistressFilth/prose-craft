@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.7] - 2026-08-08
+
+### Changed
+- Removed the unused `words: list[str]` parameter from `prose_craft.analysis.cohesion.count_connectives`. The parameter was never read by the function body; the single production caller (`analysis/metrics.py`) and the two tests in `test_cohesion.py` were updated to match.
+
 ## [0.7.6] - 2026-08-08
 
 ### Fixed
