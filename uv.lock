@@ -941,6 +941,7 @@ dependencies = [
     { name = "pydantic-settings", extra = ["toml"] },
     { name = "python-frontmatter" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
@@ -966,6 +967,7 @@ requires-dist = [
     { name = "pydantic-settings", extras = ["toml"], specifier = ">=2.14.2,<3" },
     { name = "python-frontmatter", specifier = ">=1.1.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "rich", specifier = ">=13" },
     { name = "typer", specifier = ">=0.12" },
 ]
 
