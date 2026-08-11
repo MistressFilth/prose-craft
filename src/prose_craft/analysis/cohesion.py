@@ -67,7 +67,7 @@ class ConnectiveCounts(BaseModel):
     adversative: int = 0
 
 
-def count_connectives(text: str, words: list[str]) -> ConnectiveCounts:
+def count_connectives(text: str) -> ConnectiveCounts:
     """Count occurrences of each connective class in text.
 
     Uses word-boundary regex on the lowercase text. Returns zeros for
