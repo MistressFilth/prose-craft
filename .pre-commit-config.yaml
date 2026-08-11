@@ -20,7 +20,7 @@ repos:
         # Strip pre-commit's GIT_* so test fixtures that init their own
         # repos walk up to the real toplevel instead of pre-commit's
         # GIT_DIR.
-        entry: env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_COMMON_DIR uv run make test
+        entry: env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_COMMON_DIR uv run --frozen make test
         language: system
         pass_filenames: false
         stages: [pre-commit]

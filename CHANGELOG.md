@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.8] - 2026-08-11
+
+### Fixed
+- `pre-commit`'s `test` hook now passes `--frozen` to `uv run` (matching the `ty` hook on line 15), keeping `uv.lock` stable during commit when `pyproject.toml` is touched.
+
 ## [0.7.7] - 2026-08-08
 
 ### Changed
