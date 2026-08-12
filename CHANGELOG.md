@@ -11,6 +11,13 @@
   ships `microsoft` lexicon and `microsoft-simple-human` never-list
   under `claude-code/plugin/voices/_lexicons/` and `_never_lists/`.
 
+### Fixed
+
+- Windows runtime directory now applies an explicit DACL granting
+  the current user full control and denying Everyone, matching the
+  POSIX `chmod(0o700)` restriction. `pywin32` is required on Windows;
+  install via `prose-craft[windows]`. Closes #31.
+
 ## [0.7.8] - 2026-08-11
 
 ### Fixed
