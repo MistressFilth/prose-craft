@@ -2,10 +2,10 @@ banned:
   - utilize
   - leverage
 preferred:
-  - rule: utilize
-    preferred: use
-  - rule: leverage
-    preferred: draw on
+  - instead_of: utilize
+    use: use
+  - instead_of: leverage
+    use: draw on
 taboo_phrases:
   - synergy
   - move the needle

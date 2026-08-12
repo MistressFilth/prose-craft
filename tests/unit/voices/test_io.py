@@ -454,3 +454,19 @@ def test_load_never_list_propagates_yaml_error(tmp_voices_root: Path) -> None:
 def test_load_never_list_rejects_invalid_name(tmp_voices_root: Path) -> None:
     with pytest.raises(VoiceNameError):
         load_never_list("../escape", root=tmp_voices_root)
+
+
+def test_load_lexicon_empty_file_returns_default(tmp_voices_root: Path) -> None:
+    lex_dir = tmp_voices_root / "_lexicons"
+    lex_dir.mkdir()
+    (lex_dir / "empty.yaml").write_text("", encoding="utf-8")
+
+    assert load_lexicon("empty", root=tmp_voices_root) == {}
+
+
+def test_load_never_list_empty_file_returns_default(tmp_voices_root: Path) -> None:
+    nl_dir = tmp_voices_root / "_never_lists"
+    nl_dir.mkdir()
+    (nl_dir / "empty.yaml").write_text("", encoding="utf-8")
+
+    assert load_never_list("empty", root=tmp_voices_root) == {"rules": [], "attributions": []}
