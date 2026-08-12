@@ -77,9 +77,73 @@ def app_runtime_dir() -> Path:
     except OSError:
         path = xdg.state_home() / APP / "run"
         path.mkdir(parents=True, exist_ok=True)
-    if os.name != "nt":
+    if os.name == "nt":
+        _apply_owner_only_dacl(path)
+    else:
         path.chmod(0o700)
     return path
+
+
+def _apply_owner_only_dacl(path: Path) -> None:
+    """Restrict ``path`` on Windows so only the current user can access it.
+
+    POSIX has ``chmod(0o700)``; Windows honors only the read-only bit
+    on ``os.chmod``, so we apply an explicit DACL via win32security
+    instead. The runtime directory is created with this ACL so child
+    dirs (``scratch/``) and files inherit the restriction.
+
+    Raises :class:`RuntimeError` if ``pywin32`` is not installed.
+    Failure to apply the ACL raises rather than silently leaving the
+    directory world-readable.
+    """
+    try:
+        import win32security  # type: ignore[import-not-found]  # ty: ignore[unresolved-import]
+        from win32security import (  # type: ignore[import-not-found]  # ty: ignore[unresolved-import]
+            CONTAINER_INHERIT_ACE,
+            DACL_SECURITY_INFORMATION,
+            INHERIT_ONLY_ACE,
+            OBJECT_INHERIT_ACE,
+            PROTECTED_DACL_SECURITY_INFORMATION,
+            SE_FILE_OBJECT,
+            ACL,
+            SetSecurityInfo,
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "Windows runtime ACL requires pywin32; install with "
+            "`uv pip install 'prose-craft[windows]'` or "
+            "`pip install pywin32`"
+        ) from exc
+
+    user_sid, _, _ = win32security.LookupAccountName(None, win32security.GetUserName())
+    everyone_sid = win32security.ConvertStringSidToSid("S-1-1-0")
+
+    acl = ACL()
+    # ACE 1: grant owner full control on the directory itself.
+    acl.AddAccessAllowedAce(win32security.FILE_ALL_ACCESS, 0, user_sid)
+    # ACE 2: grant owner full control on future children (inherit-only).
+    acl.AddAccessAllowedAce(
+        win32security.FILE_ALL_ACCESS,
+        OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE | INHERIT_ONLY_ACE,
+        user_sid,
+    )
+    # ACE 3: deny Everyone on the directory itself.
+    acl.AddAccessDeniedAce(win32security.FILE_ALL_ACCESS, 0, everyone_sid)
+    # ACE 4: deny Everyone on future children (inherit-only).
+    acl.AddAccessDeniedAce(
+        win32security.FILE_ALL_ACCESS,
+        OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE | INHERIT_ONLY_ACE,
+        everyone_sid,
+    )
+    SetSecurityInfo(
+        str(path),
+        SE_FILE_OBJECT,
+        DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+        None,
+        None,
+        acl,
+        None,
+    )
 
 
 def default_voices_root() -> Path:

@@ -22,6 +22,16 @@ make init
 The Makefile target runs `uv sync --all-extras` and installs the engine
 plus its dev tools.
 
+On Windows, the runtime directory hardening needs pywin32; install it
+as an extra so `app_runtime_dir()` can apply an owner-only DACL:
+
+```bash
+pip install 'prose-craft[windows]'
+```
+
+`uv sync` already pulls it in via `--all-extras`; the `pip` form above
+is for non-uv installs.
+
 ## Quickstart
 
 ```bash

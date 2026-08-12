@@ -24,6 +24,9 @@ dependencies = [
     "platformdirs>=4.0",
 ]
 
+[project.optional-dependencies]
+windows = ["pywin32>=306"]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",

@@ -945,6 +945,11 @@ dependencies = [
     { name = "typer" },
 ]
 
+[package.optional-dependencies]
+windows = [
+    { name = "pywin32" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "pre-commit" },
@@ -966,10 +971,12 @@ requires-dist = [
     { name = "pydantic-ai-slim", specifier = ">=2.18" },
     { name = "pydantic-settings", extras = ["toml"], specifier = ">=2.14.2,<3" },
     { name = "python-frontmatter", specifier = ">=1.1.0" },
+    { name = "pywin32", marker = "extra == 'windows'", specifier = ">=306" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rich", specifier = ">=13" },
     { name = "typer", specifier = ">=0.12" },
 ]
+provides-extras = ["windows"]
 
 [package.metadata.requires-dev]
 dev = [
