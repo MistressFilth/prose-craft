@@ -86,3 +86,44 @@ def voice_path(name: str, *, root: Path | None = None) -> Path:
     from prose_craft.config import load_settings
 
     return load_settings().voices_root / name / "voice.md"
+
+
+def lexicon_path(name: str, *, root: Path | None = None) -> Path:
+    """Return the resolved path for a lexicon ``<name>``.
+
+    Mirrors :func:`voice_path` against ``_lexicons/<name>.yaml`` in each
+    voice root. First match wins; absent falls back to the user-root
+    candidate so callers that synthesize a path even for missing
+    lexicons (write paths, future authoring tools) get the expected
+    target location.
+    """
+    if _NAME_RE.fullmatch(name) is None:
+        raise VoiceNameError(f"invalid lexicon name {name!r}: must match [a-zA-Z][a-zA-Z0-9-]*")
+    if root is not None:
+        return root / "_lexicons" / f"{name}.yaml"
+    for r in voice_roots():
+        candidate = r / "_lexicons" / f"{name}.yaml"
+        if candidate.is_file():
+            return candidate
+    from prose_craft.config import load_settings
+
+    return load_settings().voices_root / "_lexicons" / f"{name}.yaml"
+
+
+def never_list_path(name: str, *, root: Path | None = None) -> Path:
+    """Return the resolved path for a never-list ``<name>``.
+
+    Mirrors :func:`voice_path` against ``_never_lists/<name>.yaml`` in
+    each voice root.
+    """
+    if _NAME_RE.fullmatch(name) is None:
+        raise VoiceNameError(f"invalid never-list name {name!r}: must match [a-zA-Z][a-zA-Z0-9-]*")
+    if root is not None:
+        return root / "_never_lists" / f"{name}.yaml"
+    for r in voice_roots():
+        candidate = r / "_never_lists" / f"{name}.yaml"
+        if candidate.is_file():
+            return candidate
+    from prose_craft.config import load_settings
+
+    return load_settings().voices_root / "_never_lists" / f"{name}.yaml"

@@ -3,12 +3,15 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from prose_craft.voices.io import (
     VoiceDeleteError,
     VoiceProfileNotFound,
     delete_voice,
     list_voices,
+    load_lexicon,
+    load_never_list,
     read_voice,
     read_voice_file,
     write_voice,
@@ -394,3 +397,76 @@ def test_init_from_template_rejects_front_matter_placeholder(monkeypatch):
     monkeypatch.setattr("prose_craft.data.load_template", lambda: drifted)
     with pytest.raises(ValueError, match="placeholder"):
         init_from_template("foo-voice")
+
+
+def test_load_lexicon_returns_parsed_payload(tmp_voices_root: Path) -> None:
+    lex_dir = tmp_voices_root / "_lexicons"
+    lex_dir.mkdir()
+    payload = {"banned": ["utilize"], "preferred": [{"rule": "utilize", "preferred": "use"}]}
+    (lex_dir / "microsoft.yaml").write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+    assert load_lexicon("microsoft", root=tmp_voices_root) == payload
+
+
+def test_load_lexicon_missing_raises(tmp_voices_root: Path) -> None:
+    with pytest.raises(VoiceProfileNotFound):
+        load_lexicon("absent", root=tmp_voices_root)
+
+
+def test_load_lexicon_propagates_yaml_error(tmp_voices_root: Path) -> None:
+    lex_dir = tmp_voices_root / "_lexicons"
+    lex_dir.mkdir()
+    (lex_dir / "broken.yaml").write_text("banned: [\n", encoding="utf-8")
+    with pytest.raises(yaml.YAMLError):
+        load_lexicon("broken", root=tmp_voices_root)
+
+
+def test_load_lexicon_rejects_invalid_name(tmp_voices_root: Path) -> None:
+    with pytest.raises(VoiceNameError):
+        load_lexicon("../escape", root=tmp_voices_root)
+
+
+def test_load_never_list_returns_parsed_payload(tmp_voices_root: Path) -> None:
+    nl_dir = tmp_voices_root / "_never_lists"
+    nl_dir.mkdir()
+    payload = {
+        "rules": [{"id": "ms-01", "rule": "Avoid jargon.", "detection": "agent-required"}],
+        "attributions": [{"field": "?", "source": "test", "license": "CC BY 4.0"}],
+    }
+    (nl_dir / "microsoft-simple-human.yaml").write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+    assert load_never_list("microsoft-simple-human", root=tmp_voices_root) == payload
+
+
+def test_load_never_list_missing_raises(tmp_voices_root: Path) -> None:
+    with pytest.raises(VoiceProfileNotFound):
+        load_never_list("absent", root=tmp_voices_root)
+
+
+def test_load_never_list_propagates_yaml_error(tmp_voices_root: Path) -> None:
+    nl_dir = tmp_voices_root / "_never_lists"
+    nl_dir.mkdir()
+    (nl_dir / "broken.yaml").write_text("- {rule:\n", encoding="utf-8")
+    with pytest.raises(yaml.YAMLError):
+        load_never_list("broken", root=tmp_voices_root)
+
+
+def test_load_never_list_rejects_invalid_name(tmp_voices_root: Path) -> None:
+    with pytest.raises(VoiceNameError):
+        load_never_list("../escape", root=tmp_voices_root)
+
+
+def test_load_lexicon_empty_file_returns_default(tmp_voices_root: Path) -> None:
+    lex_dir = tmp_voices_root / "_lexicons"
+    lex_dir.mkdir()
+    (lex_dir / "empty.yaml").write_text("", encoding="utf-8")
+
+    assert load_lexicon("empty", root=tmp_voices_root) == {}
+
+
+def test_load_never_list_empty_file_returns_default(tmp_voices_root: Path) -> None:
+    nl_dir = tmp_voices_root / "_never_lists"
+    nl_dir.mkdir()
+    (nl_dir / "empty.yaml").write_text("", encoding="utf-8")
+
+    assert load_never_list("empty", root=tmp_voices_root) == {"rules": [], "attributions": []}

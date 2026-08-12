@@ -17,7 +17,12 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from pydantic import BaseModel
 
-from prose_craft.voices.location import VoiceNameError, voice_path
+from prose_craft.voices.location import (
+    VoiceNameError,
+    lexicon_path,
+    never_list_path,
+    voice_path,
+)
 
 if TYPE_CHECKING:
     from prose_craft.voices.model import VoiceProfile
@@ -130,6 +135,38 @@ def _parse_voice_file(path: Path) -> "VoiceProfile":
     from prose_craft.voices.model import VoiceProfile
 
     return VoiceProfile.model_validate(front_matter)
+
+
+def load_lexicon(name: str, *, root: Path | None = None) -> dict:
+    """Load ``_lexicons/<name>.yaml`` and return the parsed payload.
+
+    Raises :class:`VoiceProfileNotFound` if the resolved path is not a
+    file. YAML parse errors propagate as :class:`yaml.YAMLError`. The
+    caller is responsible for merging the returned dict into a voice
+    profile's ``diction`` block (the voice's own entries override).
+    """
+    path = lexicon_path(name, root=root)
+    if not path.is_file():
+        raise VoiceProfileNotFound(f"lexicon {name!r} not found at {path}")
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def load_never_list(name: str, *, root: Path | None = None) -> dict:
+    """Load ``_never_lists/<name>.yaml`` and return the parsed payload.
+
+    Returns a mapping with two top-level keys: ``rules`` (list of
+    rule-entry dicts) and ``attributions`` (list of attribution
+    records). The mapping shape mirrors :func:`load_lexicon`, where
+    the file's sibling metadata sits at the same document level as
+    the primary payload.
+
+    Raises :class:`VoiceProfileNotFound` if the resolved path is not a
+    file. YAML parse errors propagate as :class:`yaml.YAMLError`.
+    """
+    path = never_list_path(name, root=root)
+    if not path.is_file():
+        raise VoiceProfileNotFound(f"never-list {name!r} not found at {path}")
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {"rules": [], "attributions": []}
 
 
 def write_voice(
