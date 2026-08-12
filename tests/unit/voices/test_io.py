@@ -426,10 +426,13 @@ def test_load_lexicon_rejects_invalid_name(tmp_voices_root: Path) -> None:
         load_lexicon("../escape", root=tmp_voices_root)
 
 
-def test_load_never_list_returns_parsed_list(tmp_voices_root: Path) -> None:
+def test_load_never_list_returns_parsed_payload(tmp_voices_root: Path) -> None:
     nl_dir = tmp_voices_root / "_never_lists"
     nl_dir.mkdir()
-    payload = [{"id": "ms-01", "rule": "Avoid jargon.", "detection": "agent-required"}]
+    payload = {
+        "rules": [{"id": "ms-01", "rule": "Avoid jargon.", "detection": "agent-required"}],
+        "attributions": [{"field": "?", "source": "test", "license": "CC BY 4.0"}],
+    }
     (nl_dir / "microsoft-simple-human.yaml").write_text(yaml.safe_dump(payload), encoding="utf-8")
 
     assert load_never_list("microsoft-simple-human", root=tmp_voices_root) == payload

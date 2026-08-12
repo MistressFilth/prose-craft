@@ -151,8 +151,14 @@ def load_lexicon(name: str, *, root: Path | None = None) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def load_never_list(name: str, *, root: Path | None = None) -> list:
+def load_never_list(name: str, *, root: Path | None = None) -> dict:
     """Load ``_never_lists/<name>.yaml`` and return the parsed payload.
+
+    Returns a mapping with two top-level keys: ``rules`` (list of
+    rule-entry dicts) and ``attributions`` (list of attribution
+    records). The mapping shape mirrors :func:`load_lexicon`, where
+    the file's sibling metadata sits at the same document level as
+    the primary payload.
 
     Raises :class:`VoiceProfileNotFound` if the resolved path is not a
     file. YAML parse errors propagate as :class:`yaml.YAMLError`.
@@ -160,7 +166,7 @@ def load_never_list(name: str, *, root: Path | None = None) -> list:
     path = never_list_path(name, root=root)
     if not path.is_file():
         raise VoiceProfileNotFound(f"never-list {name!r} not found at {path}")
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or []
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {"rules": [], "attributions": []}
 
 
 def write_voice(
