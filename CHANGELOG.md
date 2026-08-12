@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `_lexicons/<name>.yaml` and `_never_lists/<name>.yaml` now resolve
+  across user, project, and shared voice roots via
+  `prose_craft.voices.location.lexicon_path` / `never_list_path` and
+  `prose_craft.voices.io.load_lexicon` / `load_never_list`. Plugin
+  ships `microsoft` lexicon and `microsoft-simple-human` never-list
+  under `claude-code/plugin/voices/_lexicons/` and `_never_lists/`.
+
 ## [0.7.8] - 2026-08-11
 
 ### Fixed
