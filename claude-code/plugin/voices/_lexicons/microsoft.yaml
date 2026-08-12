@@ -1,0 +1,16 @@
+banned:
+  - utilize
+  - leverage
+preferred:
+  - rule: utilize
+    preferred: use
+  - rule: leverage
+    preferred: draw on
+taboo_phrases:
+  - synergy
+  - move the needle
+attributions:
+  - field: "?"
+    source: Microsoft Writing Style Guide
+    license: CC BY 4.0
+    date: 2026-08-11

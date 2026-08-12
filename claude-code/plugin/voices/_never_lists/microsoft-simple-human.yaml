@@ -1,0 +1,45 @@
+rules:
+  - id: ms-simple-01
+    rule: Prefer simple, direct words over clever ones.
+    detection: agent-required
+  - id: ms-simple-02
+    rule: Use contractions to sound natural.
+    detection: agent-required
+  - id: ms-simple-03
+    rule: Avoid corporate buzzwords and jargon.
+    detection: agent-required
+  - id: ms-simple-04
+    rule: Keep sentences short and punchy.
+    detection: agent-required
+  - id: ms-simple-05
+    rule: Address the reader as "you" when guidance is direct.
+    detection: agent-required
+  - id: ms-simple-06
+    rule: Lead with what the reader needs to do, not background.
+    detection: agent-required
+  - id: ms-simple-07
+    rule: Use active voice unless passive genuinely serves clarity.
+    detection: agent-required
+  - id: ms-simple-08
+    rule: Avoid hedging language that softens the message without adding truth.
+    detection: agent-required
+  - id: ms-simple-09
+    rule: Prefer concrete examples over abstractions.
+    detection: agent-required
+  - id: ms-simple-10
+    rule: Avoid idioms that don't translate well across audiences.
+    detection: agent-required
+  - id: ms-simple-11
+    rule: Write numbers as words below ten, digits at ten and above.
+    detection: agent-required
+  - id: ms-simple-12
+    rule: Drop filler phrases like "in order to", "at this point in time".
+    detection: agent-required
+  - id: ms-simple-13
+    rule: End sections with the next action the reader should take.
+    detection: agent-required
+attributions:
+  - field: "?"
+    source: Microsoft brand-voice principles
+    license: CC BY 4.0
+    date: 2026-08-11
