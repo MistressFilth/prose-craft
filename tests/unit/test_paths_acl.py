@@ -88,8 +88,8 @@ def test_apply_owner_only_dacl_sets_protected_flag(tmp_path: Path) -> None:
         win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
     )
     control = sd.GetSecurityDescriptorControl()
-    # bit 1 of the control word is SE_DACL_PROTECTED.
-    assert control & 0x4, "SE_DACL_PROTECTED must be set on the security descriptor"
+    # bit 12 (0x1000) of the control word is SE_DACL_PROTECTED.
+    assert control & 0x1000, "SE_DACL_PROTECTED must be set on the security descriptor"
 
 
 @windows_only
