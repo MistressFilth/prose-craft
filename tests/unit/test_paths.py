@@ -11,6 +11,7 @@ import pytest
 from prose_craft import paths
 
 posix_only = pytest.mark.skipif(os.name == "nt", reason="POSIX modes only")
+windows_only = pytest.mark.skipif(os.name != "nt", reason="Windows-only ACL helper")
 
 _ALL_VARS = (
     "PROSE_CRAFT_VOICES_ROOT",
@@ -153,6 +154,49 @@ def test_app_runtime_dir_tightens_a_loose_existing_dir(
     monkeypatch.setenv("XDG_RUNTIME_DIR", str(runtime))
     created = paths.app_runtime_dir()
     assert stat.S_IMODE(created.stat().st_mode) == 0o700
+
+
+@windows_only
+def test_app_runtime_dir_tightens_a_loose_existing_dir_on_windows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The DACL is re-applied on every call, so it is self-healing on Windows."""
+    import win32security
+
+    runtime = tmp_path / "run"
+    loose = runtime / "prose-craft"
+    loose.mkdir(parents=True)
+    # Loosen: replace the DACL with a single allow-Everyone-full-control ACE.
+    new_dacl = win32security.ACL()
+    everyone = win32security.ConvertStringSidToSid("S-1-1-0")
+    new_dacl.AddAccessAllowedAce(win32security.FILE_ALL_ACCESS, 0, everyone)
+    win32security.SetSecurityInfo(
+        str(loose),
+        win32security.SE_FILE_OBJECT,
+        win32security.DACL_SECURITY_INFORMATION,
+        None,
+        None,
+        new_dacl,
+        None,
+    )
+
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(runtime))
+    paths.app_runtime_dir()  # heals
+
+    sd_after = win32security.GetSecurityInfo(
+        str(loose),
+        win32security.SE_FILE_OBJECT,
+        win32security.DACL_SECURITY_INFORMATION,
+    )
+    dacl_after = sd_after.GetSecurityDescriptorDacl()
+    # The deny-Everyone ACE must be present after healing.
+    deny_found = False
+    for i in range(dacl_after.GetAceCount()):
+        ace = dacl_after.GetAce(i)
+        if ace[0][0] == 1 and ace[2] == everyone:
+            deny_found = True
+            break
+    assert deny_found, "second app_runtime_dir() call must re-apply the deny-Everyone ACE"
 
 
 def test_app_runtime_dir_is_idempotent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
