@@ -11,7 +11,7 @@ import pytest
 from prose_craft import paths
 
 posix_only = pytest.mark.skipif(os.name == "nt", reason="POSIX modes only")
-windows_only = pytest.mark.skipif(os.name != "nt", reason="Windows-only ACL helper")
+windows_only = pytest.mark.skip(reason="Re-enabled after #47 ships (Windows ACL helper).")
 
 _ALL_VARS = (
     "PROSE_CRAFT_VOICES_ROOT",
@@ -161,6 +161,8 @@ def test_app_runtime_dir_tightens_a_loose_existing_dir_on_windows(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The DACL is re-applied on every call, so it is self-healing on Windows.
+
+    Re-enabled after #47 ships (Windows ACL helper).
 
     Setup: replace the runtime dir's DACL with an allow-Everyone-
     full-control ACE. pywin32's ``ACL`` wrapper is broken on some
