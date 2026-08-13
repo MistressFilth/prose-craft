@@ -20,6 +20,8 @@ windows_only = pytest.mark.skipif(os.name != "nt", reason="Windows-only ACL help
 @windows_only
 def test_apply_owner_only_dacl_grants_owner(tmp_path: Path) -> None:
     """The current user's SID appears in an AccessAllowed ACE with full rights."""
+    import win32api
+    import win32file
     import win32security
 
     target = tmp_path / "runtime"
@@ -32,13 +34,13 @@ def test_apply_owner_only_dacl_grants_owner(tmp_path: Path) -> None:
         win32security.DACL_SECURITY_INFORMATION,
     )
     dacl = sd.GetSecurityDescriptorDacl()
-    user_sid, _, _ = win32security.LookupAccountName(None, win32security.GetUserName())
+    user_sid, _, _ = win32security.LookupAccountName(None, win32api.GetUserName())
     ace_found = False
     for i in range(dacl.GetAceCount()):
         ace = dacl.GetAce(i)
         ace_sid = ace[2]
         ace_type = ace[0][0]
-        if ace_type == 0 and ace_sid == user_sid and ace[1] == win32security.FILE_ALL_ACCESS:
+        if ace_type == 0 and ace_sid == user_sid and ace[1] == win32file.FILE_ALL_ACCESS:
             ace_found = True
             break
     assert ace_found, "current user must appear in an AccessAllowed ACE with FILE_ALL_ACCESS"
@@ -47,6 +49,7 @@ def test_apply_owner_only_dacl_grants_owner(tmp_path: Path) -> None:
 @windows_only
 def test_apply_owner_only_dacl_denies_everyone(tmp_path: Path) -> None:
     """The S-1-1-0 (Everyone) SID appears in an AccessDenied ACE."""
+    import win32file
     import win32security
 
     target = tmp_path / "runtime"
@@ -65,7 +68,7 @@ def test_apply_owner_only_dacl_denies_everyone(tmp_path: Path) -> None:
         ace = dacl.GetAce(i)
         ace_sid = ace[2]
         ace_type = ace[0][0]
-        if ace_type == 1 and ace_sid == everyone_sid and ace[1] == win32security.FILE_ALL_ACCESS:
+        if ace_type == 1 and ace_sid == everyone_sid and ace[1] == win32file.FILE_ALL_ACCESS:
             deny_found = True
             break
     assert deny_found, "Everyone must appear in an AccessDenied ACE with FILE_ALL_ACCESS"

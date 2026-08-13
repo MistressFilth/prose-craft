@@ -97,6 +97,8 @@ def _apply_owner_only_dacl(path: Path) -> None:
     directory world-readable.
     """
     try:
+        import win32api  # type: ignore[import-not-found]  # ty: ignore[unresolved-import]
+        import win32file  # type: ignore[import-not-found]  # ty: ignore[unresolved-import]
         import win32security  # type: ignore[import-not-found]  # ty: ignore[unresolved-import]
         from win32security import (  # type: ignore[import-not-found]  # ty: ignore[unresolved-import]
             CONTAINER_INHERIT_ACE,
@@ -115,23 +117,23 @@ def _apply_owner_only_dacl(path: Path) -> None:
             "`pip install pywin32`"
         ) from exc
 
-    user_sid, _, _ = win32security.LookupAccountName(None, win32security.GetUserName())
+    user_sid, _, _ = win32security.LookupAccountName(None, win32api.GetUserName())
     everyone_sid = win32security.ConvertStringSidToSid("S-1-1-0")
 
     acl = ACL()
     # ACE 1: grant owner full control on the directory itself.
-    acl.AddAccessAllowedAce(win32security.FILE_ALL_ACCESS, 0, user_sid)
+    acl.AddAccessAllowedAce(win32file.FILE_ALL_ACCESS, 0, user_sid)
     # ACE 2: grant owner full control on future children (inherit-only).
     acl.AddAccessAllowedAce(
-        win32security.FILE_ALL_ACCESS,
+        win32file.FILE_ALL_ACCESS,
         OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE | INHERIT_ONLY_ACE,
         user_sid,
     )
     # ACE 3: deny Everyone on the directory itself.
-    acl.AddAccessDeniedAce(win32security.FILE_ALL_ACCESS, 0, everyone_sid)
+    acl.AddAccessDeniedAce(win32file.FILE_ALL_ACCESS, 0, everyone_sid)
     # ACE 4: deny Everyone on future children (inherit-only).
     acl.AddAccessDeniedAce(
-        win32security.FILE_ALL_ACCESS,
+        win32file.FILE_ALL_ACCESS,
         OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE | INHERIT_ONLY_ACE,
         everyone_sid,
     )

@@ -161,6 +161,7 @@ def test_app_runtime_dir_tightens_a_loose_existing_dir_on_windows(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The DACL is re-applied on every call, so it is self-healing on Windows."""
+    import win32file
     import win32security
 
     runtime = tmp_path / "run"
@@ -169,7 +170,7 @@ def test_app_runtime_dir_tightens_a_loose_existing_dir_on_windows(
     # Loosen: replace the DACL with a single allow-Everyone-full-control ACE.
     new_dacl = win32security.ACL()
     everyone = win32security.ConvertStringSidToSid("S-1-1-0")
-    new_dacl.AddAccessAllowedAce(win32security.FILE_ALL_ACCESS, 0, everyone)
+    new_dacl.AddAccessAllowedAce(win32file.FILE_ALL_ACCESS, 0, everyone)
     win32security.SetSecurityInfo(
         str(loose),
         win32security.SE_FILE_OBJECT,
