@@ -183,7 +183,7 @@ def _apply_owner_only_dacl(path: Path) -> None:
     ):
         ok = fn(acl_ptr, 2, flags, FILE_ALL_ACCESS, sid_ptr)
         if not ok:
-            last_err = ctypes.GetLastError()  # type: ignore  # type: ignore[attr-defined]
+            last_err = ctypes.GetLastError()  # type: ignore
             raise OSError(f"AddAce failed: {last_err}")
 
     # Apply via SetNamedSecurityInfoW, NOT SetSecurityInfo. The ANSI
@@ -319,7 +319,7 @@ def _read_dacl_ace_records(path: Path) -> list[tuple[int, int, int, str]]:
         ace_ptr = ctypes.c_void_p()
         ok = advapi32.GetAce(p_dacl, i, ctypes.byref(ace_ptr))
         if not ok:
-            last_err = ctypes.GetLastError()  # type: ignore  # type: ignore[attr-defined]
+            last_err = ctypes.GetLastError()  # type: ignore
             raise OSError(f"GetAce({i}) failed: {last_err}")
         # GetAce returns a pointer into the DACL buffer. Use ``c_void_p``
         # for byte arithmetic — ``LP_c_byte + int`` raises TypeError on
