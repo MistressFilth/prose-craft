@@ -11,6 +11,7 @@ import pytest
 from prose_craft import paths
 
 posix_only = pytest.mark.skipif(os.name == "nt", reason="POSIX modes only")
+windows_only = pytest.mark.skip(reason="Re-enabled after #47 ships (Windows ACL helper).")
 
 _ALL_VARS = (
     "PROSE_CRAFT_VOICES_ROOT",
@@ -153,6 +154,92 @@ def test_app_runtime_dir_tightens_a_loose_existing_dir(
     monkeypatch.setenv("XDG_RUNTIME_DIR", str(runtime))
     created = paths.app_runtime_dir()
     assert stat.S_IMODE(created.stat().st_mode) == 0o700
+
+
+@windows_only
+def test_app_runtime_dir_tightens_a_loose_existing_dir_on_windows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The DACL is re-applied on every call, so it is self-healing on Windows.
+
+    Re-enabled after #47 ships (Windows ACL helper).
+
+    Setup: replace the runtime dir's DACL with an allow-Everyone-
+    full-control ACE. pywin32's ``ACL`` wrapper is broken on some
+    Python+pywin32 builds, so we build the loosen-via-allow DACL the
+    same way the helper builds its owner-only DACL — via ctypes
+    ``advapi32``. The verification reads back with the same ctypes
+    path :func:`prose_craft.paths._read_dacl_ace_records` exposes.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    import win32security
+
+    from prose_craft.paths import (
+        _ACE_TYPE_ACCESS_DENIED,
+        _read_dacl_ace_records,
+    )
+
+    runtime = tmp_path / "run"
+    loose = runtime / "prose-craft"
+    loose.mkdir(parents=True)
+
+    # Loosen: build a DACL with a single access-allowed ACE for Everyone
+    # at full control. Pure ctypes; pywin32's ACL wrapper is unusable.
+    everyone_sid = win32security.ConvertStringSidToSid("S-1-1-0")
+    everyone_bytes = bytes(everyone_sid)
+    acl_buf = (ctypes.c_byte * 4096)()
+    everyone_buf = (ctypes.c_byte * len(everyone_bytes))(*everyone_bytes)
+    advapi32 = ctypes.windll.advapi32
+    advapi32.InitializeAcl.argtypes = [ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD]
+    advapi32.InitializeAcl.restype = wintypes.BOOL
+    advapi32.AddAccessAllowedAce.argtypes = [
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+    ]
+    advapi32.AddAccessAllowedAce.restype = wintypes.BOOL
+    advapi32.SetNamedSecurityInfoW.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+    ]
+    advapi32.SetNamedSecurityInfoW.restype = wintypes.DWORD
+
+    ok = advapi32.InitializeAcl(acl_buf, len(acl_buf), 2)
+    assert ok
+    advapi32.AddAccessAllowedAce(
+        ctypes.cast(acl_buf, ctypes.c_void_p),
+        2,
+        0x1F01FF,
+        ctypes.cast(everyone_buf, ctypes.c_void_p),
+    )
+    err = advapi32.SetNamedSecurityInfoW(
+        str(loose),
+        win32security.SE_FILE_OBJECT,
+        win32security.DACL_SECURITY_INFORMATION,
+        None,
+        None,
+        ctypes.cast(acl_buf, ctypes.c_void_p),
+        None,
+    )
+    assert err == 0, f"setup SetNamedSecurityInfoW failed: {err}"
+
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(runtime))
+    paths.app_runtime_dir()  # heals
+
+    records = _read_dacl_ace_records(loose)
+    # The deny-Everyone ACE must be present after healing.
+    everyone_sid_str = win32security.ConvertSidToStringSid(everyone_sid)
+    assert any(
+        rec[0] == _ACE_TYPE_ACCESS_DENIED and rec[3] == everyone_sid_str for rec in records
+    ), "second app_runtime_dir() call must re-apply the deny-Everyone ACE"
 
 
 def test_app_runtime_dir_is_idempotent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

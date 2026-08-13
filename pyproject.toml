@@ -1,6 +1,6 @@
 [project]
 name = "prose-craft"
-version = "0.7.9"
+version = "0.7.10"
 description = "pydantic-ai engine for designing and applying prose voices"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,9 @@ dependencies = [
     "pydantic-settings[toml]>=2.14.2,<3",
     "platformdirs>=4.0",
 ]
+
+[project.optional-dependencies]
+windows = ["pywin32>=306; sys_platform == 'win32'"]
 
 [dependency-groups]
 dev = [
@@ -66,3 +69,8 @@ target-version = "py310"
 
 [tool.ty.src]
 include = ["src/prose_craft"]
+# paths.py uses ctypes dynamic attribute access (ctypes.windll.advapi32,
+# ctypes.GetLastError) which ty cannot model — POSIX lacks the symbols,
+# Windows has them but the ignore comments ty requires on POSIX become
+# unused-ignore warnings on Windows. Exclude the file from ty entirely.
+exclude = ["src/prose_craft/paths.py"]
