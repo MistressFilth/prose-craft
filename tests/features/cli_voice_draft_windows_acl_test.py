@@ -1,6 +1,6 @@
 """End-to-end Windows ACL test: ``prose voice draft`` leaves scratch restricted.
 
-Skipped on POSIX because the ACL assertions require win32security.
+Skipped on POSIX because the ACL assertions require ctypes + win32security.
 """
 
 from __future__ import annotations
@@ -12,8 +12,11 @@ import pytest
 from typer.testing import CliRunner
 
 from prose_craft.cli import app
+from prose_craft.paths import _ACE_TYPE_ACCESS_DENIED, _read_dacl_ace_records
 
 windows_only = pytest.mark.skipif(os.name != "nt", reason="Windows-only ACL helper")
+
+EVERYONE_SID_STRING = "S-1-1-0"
 
 
 @windows_only
@@ -42,17 +45,9 @@ def test_voice_draft_leaves_scratch_dir_restricted_to_owner(
     scratch = runtime / "prose-craft" / "scratch"
     assert scratch.is_dir(), "scratch dir must exist after voice draft run"
 
-    sd = win32security.GetSecurityInfo(
-        str(scratch),
-        win32security.SE_FILE_OBJECT,
-        win32security.DACL_SECURITY_INFORMATION,
-    )
-    dacl = sd.GetSecurityDescriptorDacl()
-    everyone_sid = win32security.ConvertStringSidToSid("S-1-1-0")
-    deny_found = False
-    for i in range(dacl.GetAceCount()):
-        ace = dacl.GetAce(i)
-        if ace[0][0] == 1 and ace[2] == everyone_sid:
-            deny_found = True
-            break
-    assert deny_found, "scratch dir must carry a deny-Everyone ACE after voice draft"
+    everyone_sid = win32security.ConvertStringSidToSid(EVERYONE_SID_STRING)
+    everyone_sid_str = win32security.ConvertSidToStringSid(everyone_sid)
+    records = _read_dacl_ace_records(scratch)
+    assert any(
+        rec[0] == _ACE_TYPE_ACCESS_DENIED and rec[3] == everyone_sid_str for rec in records
+    ), "scratch dir must carry a deny-Everyone ACE after voice draft"

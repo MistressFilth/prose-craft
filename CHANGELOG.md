@@ -17,6 +17,14 @@
   the current user full control and denying Everyone, matching the
   POSIX `chmod(0o700)` restriction. `pywin32` is required on Windows;
   install via `prose-craft[windows]`. Closes #31.
+- Windows runtime DACL is now built via `ctypes` calling
+  `advapi32.dll` directly rather than pywin32's `ACL` wrapper.
+  pywin32's `ACL(rev).AddAccessAllowedAce` returned error 1306
+  (revision mismatch) on the Python+pywin32 builds this project
+  supports — even when `ACL().rev` reported the revision we passed
+  in. The ctypes path (`InitializeAcl`, `AddAccessAllowedAceEx`,
+  `AddAccessDeniedAceEx`, `SetNamedSecurityInfoW`) works
+  end-to-end.
 
 ## [0.7.8] - 2026-08-11
 
