@@ -1,12 +1,12 @@
 """Unit tests for prose_craft.paths._apply_owner_only_dacl (Windows only).
 
-Unconditionally skipped while the ctypes helper is a no-op (PR #46 was
-reverted to a stub after CI segfaults). The follow-up issue tracks
-re-enabling these on Windows; see that issue's body for the unblock plan.
+Skipped on POSIX because the helper and its ctypes/pywin32 calls are
+Windows-only.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -18,7 +18,7 @@ from prose_craft.paths import (
     _read_dacl_ace_records,
 )
 
-windows_only = pytest.mark.skip(reason="Re-enabled after #47 ships (Windows ACL helper).")
+windows_only = pytest.mark.skipif(os.name != "nt", reason="Windows-only ACL helper")
 
 FILE_ALL_ACCESS = 0x1F01FF
 EVERYONE_SID_STRING = "S-1-1-0"

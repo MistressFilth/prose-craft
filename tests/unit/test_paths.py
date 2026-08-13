@@ -11,7 +11,7 @@ import pytest
 from prose_craft import paths
 
 posix_only = pytest.mark.skipif(os.name == "nt", reason="POSIX modes only")
-windows_only = pytest.mark.skip(reason="Re-enabled after #47 ships (Windows ACL helper).")
+windows_only = pytest.mark.skipif(os.name != "nt", reason="Windows-only ACL helper")
 
 _ALL_VARS = (
     "PROSE_CRAFT_VOICES_ROOT",

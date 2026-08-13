@@ -1,12 +1,11 @@
 """End-to-end Windows ACL test: ``prose voice draft`` leaves scratch restricted.
 
-Unconditionally skipped while the ctypes helper is a no-op (PR #46 was
-reverted to a stub after CI segfaults). The follow-up issue tracks
-re-enabling this on Windows.
+Skipped on POSIX because the ACL assertions require pywin32 / advapi32.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -15,7 +14,7 @@ from typer.testing import CliRunner
 from prose_craft.cli import app
 from prose_craft.paths import _ACE_TYPE_ACCESS_DENIED, _read_dacl_ace_records
 
-windows_only = pytest.mark.skip(reason="Re-enabled after #47 ships (Windows ACL helper).")
+windows_only = pytest.mark.skipif(os.name != "nt", reason="Windows-only ACL helper")
 
 EVERYONE_SID_STRING = "S-1-1-0"
 
