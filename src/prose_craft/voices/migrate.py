@@ -63,7 +63,12 @@ def migrate_voices(
     overwrite: bool = False,
     dry_run: bool = False,
 ) -> MigrationReport:
-    """Copy every <src>/<name>/voice.md to <dst>/<name>/voice.md.
+    """Copy every <src>/<name>/ directory to <dst>/<name>/.
+
+    The whole voice directory travels, not just ``voice.md``: a profile
+    declares its depth files (move catalogs, dials, surface maps,
+    exemplars) under its own directory, and copying the profile alone
+    yields a voice whose every ``depth:`` path dangles.
 
     Source is never modified. Skips names that exist at dst unless
     overwrite=True. Returns a MigrationReport enumerating outcomes.
@@ -98,8 +103,7 @@ def migrate_voices(
             continue
         try:
             if not dry_run:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(child / "voice.md", target)
+                shutil.copytree(child, target.parent, dirs_exist_ok=True)
             report.copied.append(name)
         except OSError as exc:
             report.errors.append(f"{name}: {exc}")

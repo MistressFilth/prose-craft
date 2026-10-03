@@ -103,3 +103,27 @@ def test_default_legacy_root_falls_back_to_bare_prose(monkeypatch, tmp_path):
     monkeypatch.setenv("USERPROFILE", str(home))  # Path.home() reads this on Windows
     result = default_legacy_root()
     assert result == bare
+
+
+def test_migrate_copies_depth_files_beside_profile(tmp_path):
+    """A voice profile declares its depth files; migration must carry them.
+
+    ``voice.md`` names move catalogs, dials, surface maps, and exemplars
+    under its own directory. Copying only the profile produces a voice
+    whose every ``depth:`` path dangles, and the report still says the
+    voice was copied.
+    """
+    src = tmp_path / "src"
+    dst = tmp_path / "dst"
+    voice_dir = _write_voice(src, "alpha").parent
+    (voice_dir / "moves.md").write_text("moves\n", encoding="utf-8")
+    (voice_dir / "references").mkdir()
+    (voice_dir / "references" / "character-spec.md").write_text("spec\n", encoding="utf-8")
+    (voice_dir / "exemplars").mkdir()
+    (voice_dir / "exemplars" / "readme.md").write_text("anchor\n", encoding="utf-8")
+
+    migrate_voices(src=src, dst=dst)
+
+    assert (dst / "alpha" / "moves.md").read_text(encoding="utf-8") == "moves\n"
+    assert (dst / "alpha" / "references" / "character-spec.md").exists()
+    assert (dst / "alpha" / "exemplars" / "readme.md").exists()
