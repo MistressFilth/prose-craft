@@ -13,6 +13,22 @@
 
 ### Fixed
 
+- `prose migrate voices` now copies each voice's whole directory instead
+  of `voice.md` alone. A voice profile declares its depth files (move
+  catalogs, dials, surface maps, exemplars) under its own directory;
+  copying the profile alone produced a voice whose every `depth:` path
+  dangled, while the report still listed the voice as copied. Every
+  previously migrated voice was affected.
+- The `VoiceProfile.register` shadow warning is now suppressed at the
+  class definition rather than in `pyproject.toml`'s pytest
+  `filterwarnings`. The warning is a false positive — `BaseModel.register`
+  is the deprecated abc virtual-subclass hook and is never called here —
+  and the test-scoped filter left every CLI invocation and library
+  consumer outside a pytest run still printing it.
+- The `no-co-authored-by` commit-msg hook no longer echoes a leftover
+  `DBG` line on every commit, and passes the commit message file through
+  the documented `args: ["<COMMIT_MSG_FILE>"]` / `pass_filenames: false`
+  form rather than relying on `$0` happening to receive the filename.
 - Windows runtime directory now applies an explicit DACL granting
   the current user full control and denying Everyone, matching the
   POSIX `chmod(0o700)` restriction. `pywin32` is required on Windows;
