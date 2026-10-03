@@ -8,6 +8,7 @@ typos at parse time.
 from __future__ import annotations
 
 import datetime
+import warnings
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
@@ -193,35 +194,56 @@ class Attribution(BaseModel):
     date: datetime.date | None = None
 
 
-class VoiceProfile(BaseModel):
-    """D1-D10 + audiences + attributions."""
+# ``VoiceProfile.register`` is D3 of the voice profile schema and keeps that
+# name for schema fidelity -- voice.md files on disk declare ``register:``.
+# Pydantic v2 warns that it shadows ``BaseModel.register``, which is the
+# deprecated abc virtual-subclass hook; the two never collide at runtime,
+# because one is a data field and the other is a classmethod.
+# Pydantic emits the warning unconditionally while building the class, so the
+# suppression has to be live at the class statement. Filtering it in test
+# config instead would leave every CLI invocation and library consumer
+# outside a pytest run still printing it. ``append=False`` puts the ignore in
+# front of any filter the importing process installed, so the false positive
+# stays suppressed even under a caller's ``simplefilter("always")``.
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore",
+        message=(
+            'Field name "register" in "VoiceProfile" shadows an attribute in parent "BaseModel"'
+        ),
+        category=UserWarning,
+        append=False,
+    )
 
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+    class VoiceProfile(BaseModel):
+        """D1-D10 + audiences + attributions."""
 
-    voice: str
-    version: int = 1
-    created: datetime.date
-    updated: datetime.date
-    authors: list[str] = []
-    author: str | None = None
-    imported_from: str | None = None
-    voice_persona: str | None = None
-    purpose: str | None = None
-    audience: str | None = None
-    audiences: AudiencesBlock = Field(default_factory=AudiencesBlock)
-    register: RegisterAxes
-    diction: DictionConfig
-    rhythm: RhythmConfig
-    syntax: SyntaxConfig
-    lexicon: LexiconConfig
-    structure: StructureConfig
-    never: list[NeverEntryOrStr] = []
-    lore_corpus: dict[str, Any] = Field(default_factory=dict)
-    fallbacks: dict[str, Any] = Field(default_factory=dict)
-    depth: list[dict[str, Any]] = Field(default_factory=list)
-    base: str | None = None
-    audience_secondary: str | None = None
-    attributions: list[AttributionOrStr] = []
+        model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+        voice: str
+        version: int = 1
+        created: datetime.date
+        updated: datetime.date
+        authors: list[str] = []
+        author: str | None = None
+        imported_from: str | None = None
+        voice_persona: str | None = None
+        purpose: str | None = None
+        audience: str | None = None
+        audiences: AudiencesBlock = Field(default_factory=AudiencesBlock)
+        register: RegisterAxes
+        diction: DictionConfig
+        rhythm: RhythmConfig
+        syntax: SyntaxConfig
+        lexicon: LexiconConfig
+        structure: StructureConfig
+        never: list[NeverEntryOrStr] = []
+        lore_corpus: dict[str, Any] = Field(default_factory=dict)
+        fallbacks: dict[str, Any] = Field(default_factory=dict)
+        depth: list[dict[str, Any]] = Field(default_factory=list)
+        base: str | None = None
+        audience_secondary: str | None = None
+        attributions: list[AttributionOrStr] = []
 
 
 AudienceCeiling.model_rebuild()

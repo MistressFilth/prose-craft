@@ -74,3 +74,29 @@ def test_substitution_rule_in_diction():
 def test_surface_filter_admit_list():
     f = SurfaceFilter(admit=["memo", "postcard"])
     assert f.admit == ["memo", "postcard"]
+
+
+def test_voice_profile_emits_no_shadow_warning():
+    """Importing the library must not warn that ``register`` shadows BaseModel.
+
+    ``VoiceProfile.register`` is D3 of the voice schema and must keep the
+    name; pydantic v2's ``BaseModel.register`` is a deprecated abc hook and
+    the two never collide. Suppressing this belongs at the class
+    definition, not in pytest config, so that CLI and library consumers
+    outside a test run are spared too.
+
+    ``simplefilter("always")`` is prepended inside the context so it takes
+    precedence over the ini-level ignore filter; without it this test would
+    pass against the unfixed module.
+    """
+    import importlib
+    import warnings
+
+    import prose_craft.voices.model as model_module
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        importlib.reload(model_module)
+
+    shadowing = [w for w in caught if "shadows an attribute in parent" in str(w.message)]
+    assert shadowing == []
